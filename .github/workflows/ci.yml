@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # WholeHog composes every engine, so CI checks out the ENTIRE ecosystem as siblings.
+      - name: Check out WholeHog
+        uses: actions/checkout@v4
+        with:
+          path: WholeHog
+
+      - name: Check out SmokeHouse
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/SmokeHouse
+          path: SmokeHouse
+
+      - name: Check out Carver
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/Carver
+          path: Carver
+
+      - name: Check out Renderer
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/Renderer
+          path: Renderer
+
+      - name: Check out Brine
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/Brine
+          path: Brine
+
+      - name: Check out PitBoss
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/PitBoss
+          path: PitBoss
+
+      - name: Check out DryAge
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/DryAge
+          path: DryAge
+
+      - name: Check out Twine
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/Twine
+          path: Twine
+
+      - name: Check out SmokeSignal
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/SmokeSignal
+          path: SmokeSignal
+
+      - name: Check out Jerky
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/Jerky
+          path: Jerky
+
+      - name: Check out SuperBeefSort
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/SuperBeefSort
+          path: SuperBeefSort
+
+      - name: Check out CSRBT
+        uses: actions/checkout@v4
+        with:
+          repository: RicheyWorks/CSRBT
+          path: CSRBT
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build and test the organism
+        working-directory: WholeHog
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-daemon --stacktrace
