@@ -23,5 +23,9 @@ terminal (PowerShell). Stale `.git/index.lock` fix: `Remove-Item .git\index.lock
   seam.
 - **One oracle.** Every engine's answer checks against the same TreeMap on the same seeded
   stream. New engines joining the ecosystem join `Organism` and the oracle in the same PR.
-- Findings go upstream + into the ledger; Rub (observability) and Sizzle (chaos) re-arm
-  from what this engine discovers.
+- Findings go upstream + into the ledger. Rub (engine 13, observability) and Sizzle (engine 14,
+  chaos) were the two findings this engine re-armed into real engines (2026-08-19): Rub is the
+  promoted tail watcher (composed as the fourth subscriber; `o.rub()`/`o.vitals()`), Sizzle
+  wraps Twine's sink seam so the write path is fault-injectable — `new Organism(root, seed,
+  ChaosPlan)` ties Twine over it (transparent under `none()`). Both join the Organism and the
+  oracle in the same change, per the one-oracle rule.

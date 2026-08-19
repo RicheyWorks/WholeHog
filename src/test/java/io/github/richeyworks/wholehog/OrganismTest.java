@@ -1,6 +1,8 @@
 package io.github.richeyworks.wholehog;
 
 import io.github.richeyworks.dryage.DryAge;
+import io.github.richeyworks.sizzle.ChaosPlan;
+import io.github.richeyworks.sizzle.Sizzle;
 import io.github.richeyworks.smokehouse.SmokeHouse;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +17,7 @@ import java.util.Random;
 import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -200,6 +203,69 @@ class OrganismTest {
             assertTrue(o.awaitQuiescence(AWAIT));
             assertEquals(oracle, scan(o.pitBoss().replica("exhibit").store()),
                     "the reborn replica rejoins the organism's truth");
+        }
+    }
+
+    /**
+     * Subscriber four, named: Rub is the observability organ on the same tail. Over one churn it
+     * must meter exactly the mutations the store committed, and its gauge must equal the store's
+     * own size — the composed organism proving its watcher is wired, not just present.
+     */
+    @Test
+    void theObservabilityOrganMetersTheComposedChurn(@TempDir Path root) throws IOException {
+        Random rnd = new Random(21);
+        TreeMap<Long, String> oracle = new TreeMap<>();
+        try (Organism o = new Organism(root, 21)) {
+            long before = o.primary().tailSequence();
+            churn(o, oracle, rnd, 500);
+            long committed = o.primary().tailSequence() - before;
+
+            assertTrue(o.rub().awaitObserved(committed, AWAIT),
+                    "Rub's tail feed must catch every committed mutation of the organism");
+            assertEquals(committed, o.rub().mutationsObserved(), "metered = committed");
+            assertEquals(oracle.size(), o.vitals().liveKeys(), "the gauge equals the live set");
+            assertTrue(o.vitals().gapFree(), "the organism's churn must not overrun Rub's ring");
+        }
+    }
+
+    /**
+     * Engine 14 against the composed organism: a Twine batch crashes mid-apply on the write path,
+     * and after the organism is reopened, Twine's journal replay must have re-driven EVERY index
+     * — the primary, the secondary/interval indexes Carver plans over, and the Renderer fold —
+     * so the whole organism, not merely the store, recovered the batch exactly once.
+     */
+    @Test
+    void theOrganismSurvivesAChaosBatchOnItsWritePath(@TempDir Path root) throws IOException {
+        // Five puts; the third op crashes mid-apply.
+        try (Organism o = new Organism(root, 5, ChaosPlan.crashOnceAtOp(3))) {
+            var batch = o.twine().batch();
+            for (int k = 0; k < 5; k++) {
+                batch.put((long) k, Organism.value(k + 1, 100 * k, 100 * k + 500));
+            }
+            assertThrows(Sizzle.Crash.class, batch::commit, "the fault surfaces out of commit");
+            assertEquals(1, o.chaosCrashes(), "exactly one injected fault");
+        }
+
+        // Reopen with a transparent plan: construction replays the committed journal into every index.
+        TreeMap<Long, String> expected = new TreeMap<>();
+        for (int k = 0; k < 5; k++) {
+            expected.put((long) k, Organism.value(k + 1, 100 * k, 100 * k + 500));
+        }
+        try (Organism revived = new Organism(root, 5)) {
+            assertTrue(revived.awaitQuiescence(AWAIT), "views + replica catch the replayed batch");
+
+            // The store recovered the batch exactly once.
+            assertEquals(expected, scan(revived.primary()), "store recovered the batch exactly once");
+
+            // The indexes recovered too — Carver plans over them and must see all five keys.
+            List<Long> planned = new ArrayList<>(revived.carver().query()
+                    .keysBetween(0L, 4L).keys());
+            planned.sort(null);
+            assertEquals(new ArrayList<>(expected.keySet()), planned,
+                    "the secondary/interval indexes replayed with the store");
+
+            // The Renderer fold recovered too — five distinct attrs, one key each.
+            assertEquals(5, revived.byAttr().groups(), "the materialized view replayed with the store");
         }
     }
 }

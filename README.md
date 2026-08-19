@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Java 17](https://img.shields.io/badge/Java-17-orange.svg)](https://adoptium.net/)
 
-Engine twelve of the ecosystem: **the integration organism** — the whole hog. Eleven engines
+Engine twelve of the ecosystem: **the integration organism** — the whole hog. Thirteen engines
 are each oracle-tested in isolation; WholeHog is where "in isolation" stops being the
 qualifier. One store, every engine attached at once, one composed lifecycle, one oracle.
 
@@ -17,7 +17,13 @@ try (Organism o = new Organism(root, seed)) {
     o.pitBoss().tick();                       // fleet: conducted
     o.preserveAndCure(archiveDir);            // history: preserved and dried
     o.wire().get(k);                          // the wire: loopback reads
+    o.vitals();                               // observability: the organism's pulse (Rub)
 }
+
+// ...and with a fault plan, the write path answers for its own crash-atomicity:
+try (Organism o = new Organism(root, seed, ChaosPlan.crashOnceAtOp(3))) {   // Sizzle
+    o.twine().batch().put(1, v).put(2, v).put(3, v).commit();   // throws Sizzle.Crash mid-apply
+}   // reopen: Twine's journal replay re-drives every index — the batch landed exactly once
 ```
 
 `./gradlew run` is the one-command exhibit: stand the organism up, churn it, print every
@@ -44,12 +50,23 @@ Discoveries this engine has forced upstream, on the record:
    through the indexes; Twine gained `PutSink`/`DeleteSink` so composition routes correctly.
 2. **The wire is read-only in a composed organism** — writes over SmokeSignal would bypass
    secondaries; deliberately unsolved and documented until a consumer needs it.
+3. **The watcher wanted to be an organ** (2026-08-19) — the bare tail counter this organism
+   used to prove four-subscriber convergence generalized into [Rub](https://github.com/RicheyWorks/Rub),
+   engine 13. The organism now composes Rub as its fourth tail subscriber, and `vitals()` is the
+   promoted watcher's readout — a gauge (store size, segments, live/garbage bytes) fused with a
+   meter (puts/deletes/gaps observed).
+4. **The write path wanted to be fault-injectable** (2026-08-19) — the sink seam finding (#1)
+   earned its keep: [Sizzle](https://github.com/RicheyWorks/Sizzle), engine 14, wraps that seam,
+   so the organism ties Twine over a chaos seam (transparent by default). The composed
+   crash-atomicity — Twine's journal replay re-driving *every* index, not just the store — is now
+   demonstrated in the oracle at every crash point, not asserted in a comment.
 
 ## The ecosystem
 
 Engines 1–6: [CSRBT](https://github.com/RicheyWorks/CSRBT) (index) · [SuperBeefSort](https://github.com/RicheyWorks/SuperBeefSort) (intake) · [SmokeHouse](https://github.com/RicheyWorks/SmokeHouse) (store) · [Carver](https://github.com/RicheyWorks/Carver) (read planner) · [Renderer](https://github.com/RicheyWorks/Renderer) (materialized views) · [Brine](https://github.com/RicheyWorks/Brine) (adaptive cache).
 Engines 7–11: [PitBoss](https://github.com/RicheyWorks/PitBoss) (fleet conductor) · [DryAge](https://github.com/RicheyWorks/DryAge) (time travel) · [Twine](https://github.com/RicheyWorks/Twine) (atomic batches) · [SmokeSignal](https://github.com/RicheyWorks/SmokeSignal) (the wire) · [Jerky](https://github.com/RicheyWorks/Jerky) (cold archives).
 Engine 12: **WholeHog** (this repo) — all of them, at once.
+Engines 13–14: [Rub](https://github.com/RicheyWorks/Rub) (observability) · [Sizzle](https://github.com/RicheyWorks/Sizzle) (chaos) — composed here as the fourth tail subscriber and the write-path chaos seam.
 
 ## Build
 

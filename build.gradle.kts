@@ -2,6 +2,7 @@ plugins {
     `java-library`
     application
     `maven-publish`
+    signing
 }
 
 group = "io.github.richeyworks"
@@ -33,6 +34,8 @@ dependencies {
     api("io.github.richeyworks:twine:0.1.0")
     api("io.github.richeyworks:smokesignal:0.1.0")
     api("io.github.richeyworks:jerky:0.1.0")
+    api("io.github.richeyworks:rub:0.1.0")
+    api("io.github.richeyworks:sizzle:0.1.0")
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -73,5 +76,39 @@ publishing {
                 }
             }
         }
+    }
+}
+
+// Phase 9 release prep: Central requires a javadoc jar per artifact.
+java {
+    withJavadocJar()
+}
+
+tasks.javadoc {
+    (options as StandardJavadocDocletOptions).apply {
+        encoding = "UTF-8"
+        addStringOption("Xdoclint:none", "-quiet")
+    }
+}
+
+// Phase 9 release prep: PGP signing + a local staging layout for the Central Portal bundle.
+// Signing activates ONLY when SIGNING_KEY is present in the environment, so everyday local
+// builds stay signature-free. Stage with: ./gradlew publishMavenPublicationToStagingRepository
+publishing {
+    repositories {
+        maven {
+            name = "staging"
+            url = uri(layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
+}
+
+signing {
+    val key = providers.environmentVariable("SIGNING_KEY").orNull
+    val pass = providers.environmentVariable("SIGNING_PASSWORD").orNull
+    isRequired = key != null
+    if (key != null) {
+        useInMemoryPgpKeys(key, pass)
+        sign(publishing.publications["maven"])
     }
 }

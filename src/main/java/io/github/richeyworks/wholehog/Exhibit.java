@@ -21,8 +21,8 @@ public final class Exhibit {
         System.out.println("WholeHog — the organism, standing up in " + root);
 
         try (Organism o = new Organism(root, 42)) {
-            System.out.println("  11 engines attached: store+indexes, carver, renderer, "
-                    + "brine, pitboss+replica, vault, twine, wire, watcher");
+            System.out.println("  13 engines attached: store+indexes, carver, renderer, "
+                    + "brine, pitboss+replica, vault, twine, wire, rub, sizzle-seam");
 
             for (int i = 0; i < 2_000; i++) {                  // the churn
                 if (rnd.nextInt(10) == 0) {
@@ -60,9 +60,42 @@ public final class Exhibit {
                 System.out.println("  wire       size=" + wire.size()
                         + " countRange(100..200)=" + wire.countRange(100L, 200L));
             }
-            System.out.println("  watcher    events=" + o.watchedEvents());
-            System.out.println();
-            System.out.println("  the log is the only truth; twelve engines kept it. done.");
+            System.out.println("  wirestats  " + o.wireStats().line());
+            System.out.println("  rub        " + o.vitals().line());
+            System.out.println("  sizzle     crashes injected on the write path=" + o.chaosCrashes());
+        }
+
+        chaosDemo();
+
+        System.out.println();
+        System.out.println("  the log is the only truth; fourteen engines kept it. done.");
+    }
+
+    /**
+     * Engine 14 on the plate: stand a small organism under a fault plan, crash a Twine batch
+     * mid-apply, reopen, and show the batch still landed exactly once — the organism's own
+     * crash-atomicity, demonstrated rather than asserted in a comment.
+     */
+    private static void chaosDemo() throws Exception {
+        Path root = Files.createTempDirectory("wholehog-chaos");
+        System.out.println();
+        System.out.println("  chaos      Sizzle crashes a 5-op batch at op 3, mid-apply...");
+        try (Organism o = new Organism(root, 7,
+                io.github.richeyworks.sizzle.ChaosPlan.crashOnceAtOp(3))) {
+            var b = o.twine().batch();
+            for (int k = 0; k < 5; k++) {
+                b.put((long) k, Organism.value(k, 0, 100));
+            }
+            try {
+                b.commit();
+            } catch (io.github.richeyworks.sizzle.Sizzle.Crash crash) {
+                System.out.println("             caught: " + crash.getMessage());
+            }
+        }
+        // Reopen the organism: Twine replays the committed journal, re-driving every index.
+        try (Organism revived = new Organism(root, 7)) {
+            System.out.println("             reopened; the batch landed exactly once — store keys="
+                    + revived.primary().size());
         }
     }
 }
