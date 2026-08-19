@@ -229,6 +229,18 @@ class OrganismTest {
     }
 
     /**
+     * Teardown is idempotent: an organism inside nested try-with-resources gets buried twice,
+     * and the second burial must be a no-op — not a double-close cascade through eleven engines.
+     */
+    @Test
+    void closingTwiceIsANoop(@TempDir Path root) throws IOException {
+        Organism o = new Organism(root, 13);
+        o.store().put(1L, Organism.value(1, 0, 100));
+        o.close();
+        o.close();                                             // must not throw
+    }
+
+    /**
      * Engine 14 against the composed organism: a Twine batch crashes mid-apply on the write path,
      * and after the organism is reopened, Twine's journal replay must have re-driven EVERY index
      * — the primary, the secondary/interval indexes Carver plans over, and the Renderer fold —

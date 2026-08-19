@@ -74,6 +74,7 @@ public final class Organism implements Closeable {
     private final Twine<Long, String> twine;
     private final SmokeSignalServer<Long, String> wireServer;
     private final Rub<Long, String> rub;
+    private volatile boolean closed;
 
     public static int attrOf(String v) {
         return Integer.parseInt(v.substring(0, 3));
@@ -252,9 +253,17 @@ public final class Organism implements Closeable {
         return views && replica;
     }
 
-    /** Tear down in reverse dependency order. The store closes last; its dir persists. */
+    /**
+     * Tear down in reverse dependency order. The store closes last; its dir persists.
+     * Idempotent: a second close is a no-op — an organism inside nested try-with-resources
+     * must not die of being buried twice.
+     */
     @Override
     public void close() throws IOException {
+        if (closed) {
+            return;
+        }
+        closed = true;
         rub.close();                                           // detaches the tail observer only
         wireServer.close();
         brine.close();
