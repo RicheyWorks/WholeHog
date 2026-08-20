@@ -72,6 +72,7 @@ public final class Exhibit {
                                 .whereBetween(Organism.ATTR, 7, 7).keys().isEmpty()));
             }
             System.out.println("  wirestats  " + o.wireStats().line());
+            System.out.println("  twine      " + o.twine().stats().line());
             o.rub().tick();                                    // second sample: the pulse exists
             System.out.println("  rub        " + o.vitals().line());
             System.out.println("  pulse      " + o.rub().pulse().line());
