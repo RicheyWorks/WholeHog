@@ -52,7 +52,6 @@ public final class Exhibit {
                     .keysBetween(50L, 250L).whereBetween(Organism.ATTR, 2, 5).explain());
             System.out.println("  renderer   groups=" + o.byAttr().groups()
                     + " top3=" + o.byAttr().top(3) + " caughtUp=" + quiet);
-            System.out.println("  brine      " + o.brine().stats());
             System.out.println("  pitboss    " + o.pitBoss().tick());
             System.out.println("  vault      generations=" + o.vault().generations());
             System.out.println("  jerky      gen-" + generation + ".jerky verified in "
@@ -71,11 +70,10 @@ public final class Exhibit {
                         && !o.carver().query().keysBetween(999L, 999L)
                                 .whereBetween(Organism.ATTR, 7, 7).keys().isEmpty()));
             }
-            System.out.println("  wirestats  " + o.wireStats().line());
-            System.out.println("  twine      " + o.twine().stats().line());
             o.rub().tick();                                    // second sample: the pulse exists
-            System.out.println("  rub        " + o.vitals().line());
-            System.out.println("  pulse      " + o.rub().pulse().line());
+            System.out.println();
+            System.out.println("  the physical, one call:");
+            System.out.println("  " + o.report().replace("\n", "\n  "));
             o.vault().preserve(o.primary());                   // a second moment in the vault...
             System.out.println("  vault      retainNewest(1) released "
                     + o.vault().retainNewest(1) + ", kept " + o.vault().generations()

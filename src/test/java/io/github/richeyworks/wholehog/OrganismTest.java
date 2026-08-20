@@ -201,6 +201,24 @@ class OrganismTest {
                         "order statistics work on the seed");
             }
 
+            // Carver over history (2026-08-20): the seeded moment reopened WITH the organism's
+            // indexes — the read planner runs cost-based plans over yesterday's community.
+            try (var indexed = Organism.seedIndexedFrom(archive, restoreDir.resolve("planned"))) {
+                var historian = io.github.richeyworks.carver.Carver.over(indexed);
+                List<Long> expected = new ArrayList<>();
+                for (Map.Entry<Long, String> e : moment.entrySet()) {
+                    int a = Organism.attrOf(e.getValue());
+                    if (e.getKey() >= 20 && e.getKey() <= 120 && a >= 2 && a <= 5) {
+                        expected.add(e.getKey());
+                    }
+                }
+                List<Long> planned = new ArrayList<>(historian.query()
+                        .keysBetween(20L, 120L).whereBetween(Organism.ATTR, 2, 5).keys());
+                planned.sort(null);
+                assertEquals(expected, planned,
+                        "Carver plans over the preserved moment match brute force");
+            }
+
             io.github.richeyworks.jerky.Jerky.restore(archive, restoreDir.resolve("revived"));
             try (SmokeHouse<Long, String> revived = SmokeHouse.restore(
                     restoreDir.resolve("revived"),
@@ -245,6 +263,22 @@ class OrganismTest {
             assertEquals(committed, o.rub().mutationsObserved(), "metered = committed");
             assertEquals(oracle.size(), o.vitals().liveKeys(), "the gauge equals the live set");
             assertTrue(o.vitals().gapFree(), "the organism's churn must not overrun Rub's ring");
+
+            // The observer rides the fleet (2026-08-20): after quiescence the replica's own
+            // vitals converge to the primary's — the fleet, observed, not just conducted.
+            assertTrue(o.awaitQuiescence(AWAIT));
+            assertEquals(o.vitals().liveKeys(), o.replicaVitals().liveKeys(),
+                    "the replica's gauge converges to the primary's");
+            assertTrue(o.replicaVitals().gapFree(), "the replication feed rode its tail gap-free");
+
+            // The physical (2026-08-20): every meter, one read-only call.
+            o.rub().tick();
+            o.rub().tick();                                    // two points — the pulse exists
+            String physical = o.report();
+            for (String organ : new String[]{"rub", "pulse", "replica", "wire", "twine", "brine"}) {
+                assertTrue(physical.contains(organ), "the physical carries the " + organ + " line");
+            }
+            assertEquals(physical, o.report(), "a physical never changes the patient");
         }
     }
 

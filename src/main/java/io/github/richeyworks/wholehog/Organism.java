@@ -77,6 +77,7 @@ public final class Organism implements Closeable {
     private final Twine<Long, String> twine;
     private final SmokeSignalServer<Long, String> wireServer;
     private final Rub<Long, String> rub;
+    private final Rub<Long, String> replicaRub;
     private volatile boolean closed;
 
     public static int attrOf(String v) {
@@ -172,6 +173,10 @@ public final class Organism implements Closeable {
                 SpillSerializer.forLongs(), SpillSerializer.forStrings());
         // The fourth tail subscriber, promoted from a bare counter to the observability organ.
         this.rub = Rub.over(primary);
+        // The observer rides the fleet (2026-08-20): a second Rub on the replica's own store,
+        // metering the replication feed as it applies — pure composition, Replica.store() is
+        // public and a store is a store.
+        this.replicaRub = Rub.over(pitBoss.replica("exhibit").store());
     }
 
     // ── The organs, exposed for tests and the exhibit ────────────────────────────
@@ -237,6 +242,37 @@ public final class Organism implements Closeable {
         return rub.sample();
     }
 
+    /**
+     * The replica's vitals — the fleet, observed (2026-08-20). Converges to {@link #vitals}
+     * once the replica catches the tail. Honest bound: a {@code pitBoss().rebootstrap} replaces
+     * the replica and its store, and this observer stays attached to the store it was born on —
+     * after a rebootstrap, attach a fresh {@code Rub.over(pitBoss().replica("exhibit").store())}
+     * if the fleet's vitals still matter to you.
+     */
+    public Vitals replicaVitals() throws IOException {
+        return replicaRub.sample();
+    }
+
+    /**
+     * The organism's physical (2026-08-20): every meter the engines have grown, one read-only
+     * call — the store's vitals and pulse, the replica's vitals, the wire's traffic, the
+     * batcher's work, the cache's stats. Read-only by construction: nothing here ticks a
+     * policy or advances any state, so a physical never changes the patient.
+     */
+    public String report() throws IOException {
+        StringBuilder r = new StringBuilder();
+        r.append("rub        ").append(vitals().line()).append('\n');
+        Vitals.Pulse pulse = rub.pulse();
+        if (pulse != null) {
+            r.append("pulse      ").append(pulse.line()).append('\n');
+        }
+        r.append("replica    ").append(replicaVitals().line()).append('\n');
+        r.append("wire       ").append(wireServer.stats().line()).append('\n');
+        r.append("twine      ").append(twine.stats().line()).append('\n');
+        r.append("brine      ").append(brine.stats());
+        return r.toString();
+    }
+
     /** Mutations Rub has metered off the tail since standup — the promoted watcher's count. */
     public long watchedEvents() {
         return rub.mutationsObserved();
@@ -300,6 +336,25 @@ public final class Organism implements Closeable {
         return SmokeHouse.importSorted(dir, options(), run);
     }
 
+    /**
+     * Carver over history (2026-08-20): seed a store from a cold archive's run, then reopen
+     * it as an {@link IndexedStore} carrying the organism's own secondary and interval
+     * indexes — {@code build()} rebuilds them from the seeded contents, so yesterday's
+     * community gets today's full query surface. Wrap it in {@code Carver.over(...)} and the
+     * read planner runs cost-based plans over the preserved moment. Same honest bound as
+     * {@link #seedFrom}: state only, no log history.
+     */
+    public static IndexedStore<Long, String> seedIndexedFrom(Path archive, Path dir)
+            throws IOException {
+        try (SmokeHouse<Long, String> seeded = seedFrom(archive, dir)) {
+            // Seed, then close: build() below reopens the directory and rebuilds the indexes.
+        }
+        return IndexedStore.open(dir, options())
+                .secondary(ATTR, Comparator.<Integer>naturalOrder(), Organism::attrOf)
+                .interval(SPAN, Organism::startOf, Organism::endOf)
+                .build();
+    }
+
     /** Await every tail consumer catching up to the primary's current sequence. */
     public boolean awaitQuiescence(long timeoutMillis) {
         long deadline = System.currentTimeMillis() + timeoutMillis;
@@ -322,6 +377,7 @@ public final class Organism implements Closeable {
         }
         closed = true;
         rub.close();                                           // detaches the tail observer only
+        replicaRub.close();                                    // and the fleet's observer
         wireServer.close();
         brine.close();
         renderer.close();
