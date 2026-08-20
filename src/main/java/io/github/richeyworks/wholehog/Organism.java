@@ -287,6 +287,19 @@ public final class Organism implements Closeable {
         return SmokeHouse.scanSorted(run, options(), consumer);
     }
 
+    /**
+     * The run is a seed (2026-08-20): revive a fully queryable store at {@code dir} straight
+     * from a cold archive's sidecar — extract only {@code scan.run}, bulk-import it. The seed
+     * holds the preserved moment's STATE, not its log: no history, no tombstones, no
+     * generations — order statistics and range reads over a moment recorded then, born fresh
+     * today. When the log itself matters, {@code Jerky.restore} + {@code SmokeHouse.restore}
+     * remains the full-fidelity road.
+     */
+    public static SmokeHouse<Long, String> seedFrom(Path archive, Path dir) throws IOException {
+        byte[] run = Jerky.extract(archive, DryAge.SCAN_RUN);
+        return SmokeHouse.importSorted(dir, options(), run);
+    }
+
     /** Await every tail consumer catching up to the primary's current sequence. */
     public boolean awaitQuiescence(long timeoutMillis) {
         long deadline = System.currentTimeMillis() + timeoutMillis;

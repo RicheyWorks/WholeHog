@@ -161,6 +161,11 @@ class OrganismTest {
                 }
                 assertEquals(oracle.subMap(30L, true, 110L, true).size(),
                         wire.countRange(30L, 110L), "order statistics over the wire");
+                assertEquals(oracle.subMap(30L, true, 110L, true),
+                        new TreeMap<>(wire.rangeQuery(30L, 110L)),
+                        "and the records themselves travel (OP_RANGE, 2026-08-20)");
+                assertTrue(wire.stats().requestsServed() > 0,
+                        "the wire's own meter travels too (OP_STATS)");
             }
         }
     }
@@ -186,6 +191,15 @@ class OrganismTest {
             TreeMap<Long, String> viaColdScan = new TreeMap<>();
             assertEquals(moment.size(), Organism.coldScan(archive, viaColdScan::put));
             assertEquals(moment, viaColdScan, "coldScan reads the preserved moment exactly");
+
+            // The run is a seed (2026-08-20): a fresh, fully queryable store from the sidecar.
+            try (SmokeHouse<Long, String> seeded =
+                         Organism.seedFrom(archive, restoreDir.resolve("seeded"))) {
+                assertEquals(moment, scan(seeded), "the seed IS the moment's state");
+                assertEquals(moment.size(),
+                        seeded.countRange(seeded.firstKey(), seeded.lastKey()),
+                        "order statistics work on the seed");
+            }
 
             io.github.richeyworks.jerky.Jerky.restore(archive, restoreDir.resolve("revived"));
             try (SmokeHouse<Long, String> revived = SmokeHouse.restore(
