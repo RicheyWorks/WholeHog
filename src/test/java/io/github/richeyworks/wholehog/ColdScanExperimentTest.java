@@ -62,6 +62,7 @@ class ColdScanExperimentTest {
                 }
                 Files.createDirectories(backupDir);
                 store.backup(backupDir);
+                store.exportSorted(backupDir.resolve("scan.run"));   // the sidecar (ADR 2026-08-20)
             }
             Jerky.Cured cured = Jerky.cure(backupDir, archive);
 
@@ -69,7 +70,9 @@ class ColdScanExperimentTest {
             long[] inflate = new long[ROUNDS];
             long[] recover = new long[ROUNDS];
             long[] scan = new long[ROUNDS];
+            long[] sidecar = new long[ROUNDS];
             long scanned = -1;
+            long sidecarScanned = -1;
             for (int r = 0; r < ROUNDS; r++) {
                 // Phase 0 — the floor: one pass over the archive's bytes.
                 long t0 = System.nanoTime();
@@ -97,20 +100,32 @@ class ColdScanExperimentTest {
                 scanned = count.get();
 
                 deleteRecursively(restored);
+
+                // Phase 4 — the sidecar route (the fix): extract only scan.run, stream it.
+                AtomicLong viaSidecar = new AtomicLong();
+                t0 = System.nanoTime();
+                byte[] run = Jerky.extract(archive, "scan.run");
+                SmokeHouse.scanSorted(run, opts(), (k, v) -> viaSidecar.incrementAndGet());
+                sidecar[r] = System.nanoTime() - t0;
+                sidecarScanned = viaSidecar.get();
             }
             assertEquals(n, scanned, "the cold scan reads every record, every round");
+            assertEquals(n, sidecarScanned, "the sidecar route reads the same records");
 
             long rawMs = medianMs(raw);
             long inflateMs = medianMs(inflate);
             long recoverMs = medianMs(recover);
             long scanMs = medianMs(scan);
+            long sidecarMs = medianMs(sidecar);
             long routeMs = inflateMs + recoverMs + scanMs;
             double ratio = rawMs == 0 ? Double.POSITIVE_INFINITY : (double) routeMs / rawMs;
+            double speedup = sidecarMs == 0 ? Double.POSITIVE_INFINITY : (double) routeMs / sidecarMs;
             report.append(String.format(Locale.ROOT,
                     "  n=%,d  archive=%,dB (%.2f of raw)  floor(raw read)=%dms  "
-                    + "inflate=%dms  recover=%dms  scan=%dms  route=%dms  route/floor=%.1fx%n",
+                    + "inflate=%dms  recover=%dms  scan=%dms  route=%dms  route/floor=%.1fx  "
+                    + "SIDECAR=%dms (%.0fx faster than the route)%n",
                     n, cured.curedBytes(), cured.ratio(), rawMs, inflateMs, recoverMs, scanMs,
-                    routeMs, ratio));
+                    routeMs, ratio, sidecarMs, speedup));
         }
         System.out.println(report);
     }

@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "io.github.richeyworks"
-version = "0.1.0"
+version = "0.2.0"
 
 java {
     withSourcesJar()
@@ -25,15 +25,15 @@ tasks.withType<JavaCompile>().configureEach {
 
 dependencies {
     // Every engine, resolved to live sibling sources via the composite chain.
-    api("io.github.richeyworks:smokehouse:0.1.0")
+    api("io.github.richeyworks:smokehouse:0.2.0")
     api("io.github.richeyworks:carver:0.1.0")
     api("io.github.richeyworks:renderer:0.1.0")
     api("io.github.richeyworks:brine:0.1.0")
     api("io.github.richeyworks:pitboss:0.1.0")
-    api("io.github.richeyworks:dryage:0.1.0")
+    api("io.github.richeyworks:dryage:0.2.0")
     api("io.github.richeyworks:twine:0.1.0")
-    api("io.github.richeyworks:smokesignal:0.1.0")
-    api("io.github.richeyworks:jerky:0.1.0")
+    api("io.github.richeyworks:smokesignal:0.2.0")
+    api("io.github.richeyworks:jerky:0.2.0")
     api("io.github.richeyworks:rub:0.1.0")
     api("io.github.richeyworks:sizzle:0.1.0")
 

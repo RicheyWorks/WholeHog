@@ -181,6 +181,12 @@ class OrganismTest {
                 assertEquals(moment, scan(past.store()), "the vault's past is the moment");
             }
             Path archive = archiveDir.resolve("gen-" + generation + ".jerky");
+
+            // The sidecar (ADR 2026-08-20): the archive scans in key order, no resurrection.
+            TreeMap<Long, String> viaColdScan = new TreeMap<>();
+            assertEquals(moment.size(), Organism.coldScan(archive, viaColdScan::put));
+            assertEquals(moment, viaColdScan, "coldScan reads the preserved moment exactly");
+
             io.github.richeyworks.jerky.Jerky.restore(archive, restoreDir.resolve("revived"));
             try (SmokeHouse<Long, String> revived = SmokeHouse.restore(
                     restoreDir.resolve("revived"),

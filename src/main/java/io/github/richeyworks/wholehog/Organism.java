@@ -259,7 +259,9 @@ public final class Organism implements Closeable {
      * now cures straight off the vault's own preserved bytes.</p>
      */
     public long preserveAndCure(Path archiveDir) throws IOException {
-        long generation = vault.preserve(primary());
+        // withScanRun (ADR scan-sidecar, 2026-08-20): the generation carries its sorted run
+        // from birth, so the cured archive is cold-scannable without resurrection.
+        long generation = vault.preserve(primary(), true);
         Files.createDirectories(archiveDir);
         Jerky.Cured cured = Jerky.cure(vault.generationPath(generation),
                 archiveDir.resolve("gen-" + generation + ".jerky"));
@@ -267,6 +269,22 @@ public final class Organism implements Closeable {
             throw new IOException("fresh archive failed verification: " + cured.archive());
         }
         return generation;
+    }
+
+    /**
+     * Scan a cured archive's records in key order WITHOUT resurrecting a store (ADR
+     * scan-sidecar, 2026-08-20): extract the sorted run — only that entry is inflated — and
+     * stream it. This is the route the 2026-08-20 experiment measured against the 524× cost
+     * of inflate-everything → recover → index-walk. Works on any archive
+     * {@link #preserveAndCure} produced; an archive cured without a run fails loudly, naming
+     * what it does hold.
+     *
+     * @return the number of records scanned
+     */
+    public static int coldScan(Path archive, java.util.function.BiConsumer<Long, String> consumer)
+            throws IOException {
+        byte[] run = Jerky.extract(archive, DryAge.SCAN_RUN);
+        return SmokeHouse.scanSorted(run, options(), consumer);
     }
 
     /** Await every tail consumer catching up to the primary's current sequence. */

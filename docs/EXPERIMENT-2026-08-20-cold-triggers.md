@@ -58,8 +58,28 @@ never cost — it was a consumer, and no consumer has arrived. What changes is t
 justification when one does: the fallback it would replace is now known to cost ~2× the
 workload at fine grain.
 
+## Addendum, same day — the fix, measured
+
+The fired trigger was answered by the **sorted-run sidecar**
+([`Jerky/docs/ADR-scan-sidecar-2026-08-20.md`](https://github.com/RicheyWorks/Jerky/blob/main/docs/ADR-scan-sidecar-2026-08-20.md)):
+no `.jerky` v2 — the archive format was never the enemy; the resurrection was. SmokeHouse
+exports a flat sorted run, scan-carrying generations hold it from birth, Jerky extracts just
+that one entry, and `scanSorted` streams it. The same benchmark, re-run with the fourth phase:
+
+| n | old route (inflate→recover→scan) | sidecar route (extract→stream) | speedup |
+|---|---|---|---|
+| 20,000 | 151 ms | **7 ms** | 22× |
+| 60,000 | 458 ms | **14 ms** | 33× |
+
+The archive grows ~50% carrying the run (compressed alongside the segments), which is the
+ADR's stated cost, opt-in at preserve time. `Organism.coldScan(archive, consumer)` is the
+composed door, and the history oracle now pins that a cold scan equals the preserved moment
+exactly.
+
 ## Standing after this session
 
-- Jerky columnar cold format: **trigger fired at 524×** — next major slice, format-ADR first.
+- Jerky columnar cold format: **trigger fired at 524× — and closed the same day** by the
+  scan-sidecar ADR; cold scans now run 22–33× faster than the resurrection route. "Columnar"
+  retires from the ledger: measured, reduced to what it meant here (a sorted run), shipped.
 - DryAge record-granularity as-of: **held**, consumer trigger unchanged; the workaround is
   priced at 191%-of-churn / 1.4 MB per checkpoint at 2k-op grain.
