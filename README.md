@@ -70,6 +70,13 @@ Discoveries this engine has forced upstream, on the record:
    re-backup, and delete the staging: two copies and a recovery to read bytes that were CRC'd
    at capture. DryAge named `generationPath` for read-only archival consumers — `Jerky.cure`
    is read-only on its source by contract — and the dance is gone.
+6. **Batches wanted to cross the wire whole** (2026-08-19) — with #2 resolved, half-applied
+   wire batches became the next composition hazard. SmokeSignal gained `OP_BATCH` + the
+   `BatchRoute` seam (the server reads the whole batch before touching the route, so the
+   route decides atomicity); the organism ties the route to Twine, and any wire client gets
+   crash-atomic multi-key batches — journaled commit, idempotent replay, index fan-out —
+   without knowing Twine exists. The oracle proves the net effect lands exactly once,
+   everywhere.
 
 ## The ecosystem
 

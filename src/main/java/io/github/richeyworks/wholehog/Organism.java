@@ -141,6 +141,12 @@ public final class Organism implements Closeable {
         // same routing rule Twine keeps, now kept by SmokeSignal's WriteRoute seam. Before
         // this seam, the wire was read-only in the organism by decree; now it is writable by
         // construction.
+        // ...and wire BATCHes land whole through Twine (2026-08-19): any wire client gets the
+        // organism's crash-atomic multi-key batches — journaled commit, idempotent replay,
+        // index fan-out — without knowing Twine exists. Synchronized on the Twine because it
+        // keeps the single-writer discipline (one in-flight batch) and wire sessions are
+        // threads of their own.
+        Twine<Long, String> batcher = this.twine;
         this.wireServer = SmokeSignalServer.serve(primary,
                 new SmokeSignalServer.WriteRoute<Long, String>() {
                     @Override public void put(Long key, String value) throws IOException {
@@ -148,6 +154,19 @@ public final class Organism implements Closeable {
                     }
                     @Override public boolean delete(Long key) throws IOException {
                         return indexed.delete(key);
+                    }
+                },
+                ops -> {
+                    synchronized (batcher) {
+                        Twine<Long, String>.Batch batch = batcher.batch();
+                        for (SmokeSignalServer.BatchOp<Long, String> op : ops) {
+                            if (op.isPut()) {
+                                batch.put(op.key(), op.value());
+                            } else {
+                                batch.delete(op.key());
+                            }
+                        }
+                        batch.commit();
                     }
                 },
                 SpillSerializer.forLongs(), SpillSerializer.forStrings());

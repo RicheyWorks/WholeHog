@@ -277,6 +277,42 @@ class OrganismTest {
     }
 
     /**
+     * Engines 9 and 10, composed (2026-08-19): a BATCH staged by a wire client crosses the
+     * socket as one request, lands through Twine — journaled, crash-atomic, index-fanned —
+     * and every downstream subscriber converges on its net effect. A wire client gets the
+     * organism's atomicity without knowing Twine exists.
+     */
+    @Test
+    void aWireBatchLandsAtomicallyAndFansOut(@TempDir Path root) throws IOException {
+        Random rnd = new Random(23);
+        TreeMap<Long, String> oracle = new TreeMap<>();
+        try (Organism o = new Organism(root, 23)) {
+            churn(o, oracle, rnd, 200);
+
+            String v1 = Organism.value(6, 100, 200);
+            String v2 = Organism.value(6, 300, 400);
+            try (var wire = o.wire()) {
+                int applied = wire.batch()
+                        .put(950L, v1)
+                        .put(951L, v2)
+                        .put(950L, v1)                          // overwrite inside the batch
+                        .delete(951L)                           // and a delete of a batch-mate
+                        .commit();
+                assertEquals(4, applied, "the whole batch, applied");
+            }
+            oracle.put(950L, v1);                              // net effect: 950 present, 951 gone
+            oracle.remove(951L);
+
+            assertTrue(o.awaitQuiescence(AWAIT), "views + replica catch the wire batch");
+            assertEquals(oracle, scan(o.primary()), "the net effect, exactly once");
+            List<Long> planned = new ArrayList<>(o.carver().query()
+                    .keysBetween(950L, 951L).whereBetween(Organism.ATTR, 6, 6).keys());
+            assertEquals(List.of(950L), planned, "the secondary index saw the batch's net effect");
+            assertEquals(oracle, scan(o.pitBoss().replica("exhibit").store()), "so did the replica");
+        }
+    }
+
+    /**
      * Teardown is idempotent: an organism inside nested try-with-resources gets buried twice,
      * and the second burial must be a no-op — not a double-close cascade through eleven engines.
      */

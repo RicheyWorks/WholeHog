@@ -23,6 +23,7 @@ public final class Exhibit {
         try (Organism o = new Organism(root, 42)) {
             System.out.println("  13 engines attached: store+indexes, carver, renderer, "
                     + "brine, pitboss+replica, vault, twine, wire, rub, sizzle-seam");
+            o.rub().tick();                                    // first sample: the pulse's baseline
 
             for (int i = 0; i < 2_000; i++) {                  // the churn
                 if (rnd.nextInt(10) == 0) {
@@ -58,6 +59,11 @@ public final class Exhibit {
                     + archive);
             try (var wire = o.wire()) {
                 wire.put(999L, Organism.value(7, 0, 100));     // a WRITE over the wire —
+                wire.batch()                                   // and a crash-atomic BATCH
+                        .put(998L, Organism.value(7, 200, 300))
+                        .delete(998L)
+                        .put(997L, Organism.value(7, 400, 500))
+                        .commit();                             // journaled through Twine
                 boolean quiet2 = o.awaitQuiescence(15_000);    // routed through every index
                 System.out.println("  wire       size=" + wire.size()
                         + " countRange(100..200)=" + wire.countRange(100L, 200L)
@@ -66,7 +72,13 @@ public final class Exhibit {
                                 .whereBetween(Organism.ATTR, 7, 7).keys().isEmpty()));
             }
             System.out.println("  wirestats  " + o.wireStats().line());
+            o.rub().tick();                                    // second sample: the pulse exists
             System.out.println("  rub        " + o.vitals().line());
+            System.out.println("  pulse      " + o.rub().pulse().line());
+            o.vault().preserve(o.primary());                   // a second moment in the vault...
+            System.out.println("  vault      retainNewest(1) released "
+                    + o.vault().retainNewest(1) + ", kept " + o.vault().generations()
+                    + " (aging is the caller's policy)");
             System.out.println("  sizzle     crashes injected on the write path=" + o.chaosCrashes());
         }
 
