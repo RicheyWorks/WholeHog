@@ -42,9 +42,12 @@ import java.util.Objects;
  *       observability organ, the watcher promoted) — each on its own subscriber ring, none
  *       aware of the others. Proving they converge together is the four-subscriber test, the
  *       organism's reason to exist.</li>
- *   <li><b>Read paths stay read paths:</b> Carver plans over the indexed store; the wire
- *       serves reads (writes over the wire would bypass the indexes — the same rule Twine's
- *       seam solved, deliberately left unsolved for SmokeSignal and documented here).</li>
+ *   <li><b>Every write path keeps the routing rule:</b> Carver plans over the indexed store,
+ *       and the wire's writes route through the index fan-out via SmokeSignal's
+ *       {@code WriteRoute} seam (2026-08-19 — the rule Twine's seam solved first, finally
+ *       solved for the wire; ledger #2's "deliberately unsolved" is resolved). A wire client
+ *       is now a first-class writer: its puts reach every secondary, every view, every
+ *       replica, every cache invalidation.</li>
  *   <li><b>History flows sideways:</b> DryAge preserves generations off the same store;
  *       Jerky cures them for cold storage.</li>
  *   <li><b>The write path is chaos-testable:</b> Twine ties not straight over the indexed
@@ -133,7 +136,20 @@ public final class Organism implements Closeable {
         this.twine = Twine.over(this.writeChaos.puts(), this.writeChaos.deletes(),
                 root.resolve("journal"),
                 SpillSerializer.forLongs(), SpillSerializer.forStrings());
+        // The wire, with its writes ROUTED (2026-08-19, ledger #2 resolved): reads answer from
+        // the primary's read surface, writes land through the IndexedStore's fan-out — the
+        // same routing rule Twine keeps, now kept by SmokeSignal's WriteRoute seam. Before
+        // this seam, the wire was read-only in the organism by decree; now it is writable by
+        // construction.
         this.wireServer = SmokeSignalServer.serve(primary,
+                new SmokeSignalServer.WriteRoute<Long, String>() {
+                    @Override public void put(Long key, String value) throws IOException {
+                        indexed.put(key, value);
+                    }
+                    @Override public boolean delete(Long key) throws IOException {
+                        return indexed.delete(key);
+                    }
+                },
                 SpillSerializer.forLongs(), SpillSerializer.forStrings());
         // The fourth tail subscriber, promoted from a bare counter to the observability organ.
         this.rub = Rub.over(primary);
@@ -215,30 +231,21 @@ public final class Organism implements Closeable {
     /**
      * Preserve the current moment and cure it for cold storage — DryAge and Jerky in one
      * motion. Returns the generation; the {@code .jerky} lands beside the vault.
+     *
+     * <p>2026-08-19, ledger #6: this used to open an {@link DryAge.AgedView} (recovery pass on
+     * a scratch copy), back the view's store up into a staging dir (a second copy), cure the
+     * re-backup, then delete the staging — two copies and a recovery to read bytes that were
+     * already CRC'd at capture. DryAge named {@code generationPath} for read-only archival
+     * consumers, and {@code Jerky.cure} is read-only on its source by contract, so the archive
+     * now cures straight off the vault's own preserved bytes.</p>
      */
     public long preserveAndCure(Path archiveDir) throws IOException {
         long generation = vault.preserve(primary());
         Files.createDirectories(archiveDir);
-        Path genDir = archiveDir.resolve("staging-" + generation);
-        // Cure straight from a fresh view's scratch? No — cure the vault generation itself
-        // via an AgedView copy so the vault stays pristine and the archive is verified bytes.
-        try (DryAge.AgedView<Long, String> view = vault.asOf(generation)) {
-            // The view's scratch dir is private; cure from a fresh backup of the view's store.
-            Files.createDirectories(genDir);
-            view.store().backup(genDir);
-            Jerky.Cured cured = Jerky.cure(genDir,
-                    archiveDir.resolve("gen-" + generation + ".jerky"));
-            if (!Jerky.verify(cured.archive())) {
-                throw new IOException("fresh archive failed verification: " + cured.archive());
-            }
-        } finally {
-            if (Files.exists(genDir)) {
-                try (var walk = Files.walk(genDir)) {
-                    for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
-                        Files.deleteIfExists(p);
-                    }
-                }
-            }
+        Jerky.Cured cured = Jerky.cure(vault.generationPath(generation),
+                archiveDir.resolve("gen-" + generation + ".jerky"));
+        if (!Jerky.verify(cured.archive())) {
+            throw new IOException("fresh archive failed verification: " + cured.archive());
         }
         return generation;
     }

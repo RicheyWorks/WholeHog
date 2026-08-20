@@ -57,8 +57,13 @@ public final class Exhibit {
             System.out.println("  jerky      gen-" + generation + ".jerky verified in "
                     + archive);
             try (var wire = o.wire()) {
+                wire.put(999L, Organism.value(7, 0, 100));     // a WRITE over the wire —
+                boolean quiet2 = o.awaitQuiescence(15_000);    // routed through every index
                 System.out.println("  wire       size=" + wire.size()
-                        + " countRange(100..200)=" + wire.countRange(100L, 200L));
+                        + " countRange(100..200)=" + wire.countRange(100L, 200L)
+                        + " wireWriteVisibleEverywhere=" + (quiet2
+                        && !o.carver().query().keysBetween(999L, 999L)
+                                .whereBetween(Organism.ATTR, 7, 7).keys().isEmpty()));
             }
             System.out.println("  wirestats  " + o.wireStats().line());
             System.out.println("  rub        " + o.vitals().line());

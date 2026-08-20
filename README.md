@@ -16,7 +16,8 @@ try (Organism o = new Organism(root, seed)) {
     o.brine().get(k);                         // cache: invalidated off the tail
     o.pitBoss().tick();                       // fleet: conducted
     o.preserveAndCure(archiveDir);            // history: preserved and dried
-    o.wire().get(k);                          // the wire: loopback reads
+    o.wire().get(k);                          // the wire: reads off the primary
+    o.wire().put(k, v);                       // wire writes: routed through every index
     o.vitals();                               // observability: the organism's pulse (Rub)
 }
 
@@ -50,6 +51,10 @@ Discoveries this engine has forced upstream, on the record:
    through the indexes; Twine gained `PutSink`/`DeleteSink` so composition routes correctly.
 2. **The wire is read-only in a composed organism** — writes over SmokeSignal would bypass
    secondaries; deliberately unsolved and documented until a consumer needs it.
+   **RESOLVED 2026-08-19:** the consumer arrived (this organism), SmokeSignal gained the
+   `WriteRoute` seam, and the organism now serves the wire with writes routed through the
+   `IndexedStore` fan-out. A wire client is a first-class writer; the oracle proves its puts
+   reach every secondary, view, replica, and invalidation.
 3. **The watcher wanted to be an organ** (2026-08-19) — the bare tail counter this organism
    used to prove four-subscriber convergence generalized into [Rub](https://github.com/RicheyWorks/Rub),
    engine 13. The organism now composes Rub as its fourth tail subscriber, and `vitals()` is the
@@ -60,6 +65,11 @@ Discoveries this engine has forced upstream, on the record:
    so the organism ties Twine over a chaos seam (transparent by default). The composed
    crash-atomicity — Twine's journal replay re-driving *every* index, not just the store — is now
    demonstrated in the oracle at every crash point, not asserted in a comment.
+5. **Curing history needed no scratch copy** (2026-08-19) — `preserveAndCure` used to open an
+   `AgedView` (a recovery pass on a scratch copy), re-back-up the view's store, cure the
+   re-backup, and delete the staging: two copies and a recovery to read bytes that were CRC'd
+   at capture. DryAge named `generationPath` for read-only archival consumers — `Jerky.cure`
+   is read-only on its source by contract — and the dance is gone.
 
 ## The ecosystem
 

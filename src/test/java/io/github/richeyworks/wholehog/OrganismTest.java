@@ -229,6 +229,54 @@ class OrganismTest {
     }
 
     /**
+     * Ledger #2, resolved and proven: a write arriving OVER THE WIRE routes through the index
+     * fan-out, so it reaches every subscriber — the secondary index Carver plans over, the
+     * Renderer fold, the replica, and the oracle's own scan. Before the WriteRoute seam this
+     * write would have landed on the primary alone and silently corrupted every secondary.
+     */
+    @Test
+    void aWireWriteReachesEverySubscriber(@TempDir Path root) throws IOException {
+        Random rnd = new Random(17);
+        TreeMap<Long, String> oracle = new TreeMap<>();
+        try (Organism o = new Organism(root, 17)) {
+            churn(o, oracle, rnd, 200);                        // local traffic first
+
+            try (var wire = o.wire()) {                        // then a WIRE client writes
+                String v1 = Organism.value(7, 1_000, 2_000);
+                String v2 = Organism.value(7, 3_000, 4_000);
+                wire.put(900L, v1);
+                wire.put(901L, v2);
+                oracle.put(900L, v1);
+                oracle.put(901L, v2);
+                wire.delete(902L);                             // delete-of-absent: no-op false
+                if (oracle.containsKey(0L)) {                  // and a real delete over the wire
+                    wire.delete(0L);
+                    oracle.remove(0L);
+                }
+            }
+            assertTrue(o.awaitQuiescence(AWAIT), "views + replica catch the wire's writes");
+
+            // Carver plans over the secondary index — the wire's attr-7 keys must be planned.
+            List<Long> planned = new ArrayList<>(o.carver().query()
+                    .keysBetween(900L, 901L).whereBetween(Organism.ATTR, 7, 7).keys());
+            planned.sort(null);
+            assertEquals(List.of(900L, 901L), planned,
+                    "the secondary index saw the wire's writes");
+
+            // The Renderer fold counted them.
+            long attr7 = 0;
+            for (String v : oracle.values()) {
+                if (Organism.attrOf(v) == 7) attr7++;
+            }
+            assertEquals(attr7, o.byAttr().total(7), "the materialized view saw them");
+
+            // The replica replicated them, and the store equals the oracle.
+            assertEquals(oracle, scan(o.pitBoss().replica("exhibit").store()), "replica");
+            assertEquals(oracle, scan(o.primary()), "the primary is the truth");
+        }
+    }
+
+    /**
      * Teardown is idempotent: an organism inside nested try-with-resources gets buried twice,
      * and the second burial must be a no-op — not a double-close cascade through eleven engines.
      */

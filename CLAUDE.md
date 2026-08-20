@@ -18,9 +18,9 @@ terminal (PowerShell). Stale `.git/index.lock` fix: `Remove-Item .git\index.lock
 - **WholeHog is a consumer, never a shortcut.** It touches only public engine surfaces; if
   composition needs a new seam, name it upstream (the Twine sink seam is the precedent) and
   record it in the README's findings ledger.
-- **Writes route through the IndexedStore** — Twine over `indexed::put`/`indexed::delete`;
-  never the primary; the wire stays read-only in the organism until a consumer forces the
-  seam.
+- **Writes route through the IndexedStore** — Twine over the Sizzle seam wrapping
+  `indexed::put`/`indexed::delete`, and the wire over SmokeSignal's `WriteRoute` seam
+  (2026-08-19; ledger #2 resolved) — never the primary, on any path.
 - **One oracle.** Every engine's answer checks against the same TreeMap on the same seeded
   stream. New engines joining the ecosystem join `Organism` and the oracle in the same PR.
 - Findings go upstream + into the ledger. Rub (engine 13, observability) and Sizzle (engine 14,
