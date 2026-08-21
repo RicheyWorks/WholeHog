@@ -59,7 +59,46 @@ now stable across repeated runs. SmokeHouse 76 green, javadoc clean.
 - **put/delete garbage accounting** — both count the superseded record's bytes as garbage; a
   tombstone is counted as born-dead in its own segment. No undercount found.
 
+## R-1 · S3 · FIXED — a failed view bootstrap leaked its tail subscription (Renderer)
+
+`GroupView.register` bootstraps subscribe-then-sweep: it takes the tail subscription first, then
+base-sweeps the current store state — an order the class documents as race-free because the fold is
+replace-idempotent. But the sweep can throw — an unreadable record, or the caller's `groupOf` /
+`weightOf` rejecting a value — and when it did, the exception propagated **without closing the
+subscription just taken**. `Renderer.sumBy` only adds a view to its list *after* `register()`
+returns, so a failed registration is a view nothing else holds: its subscription lingered on the
+tail and folded every future mutation forever, on the tail thread, into an object no one could read
+or close. Fix: `register` wraps the sweep and, on any failure, unsubscribes (`close()`, cleanup
+failure suppressed onto the original) before rethrowing — the same "leave no dangling resource on the
+error path" discipline as DryAge's D1/D2 and Jerky's cure().
+
+**Probe:** `RendererTest.aFailedBootstrapDoesNotLeakItsTailSubscription` — a `groupOf` that throws
+during the base sweep fails the registration; a subsequent store mutation must not re-invoke it. It
+fails on the unfixed code (the leaked subscriber folds the new put, re-calling `groupOf`) and passes
+with the fix. Renderer 6 green, javadoc clean.
+
+## Examined and found sound — the Carver/Renderer/Brine/PitBoss row
+
+- **Carver** (cost-based read planner) — correctness is independent of the plan: the driving path
+  always returns a superset of the result and every other predicate is intersected, so a
+  mis-estimate only costs performance, never rows. The driving-path result order is documented. The
+  single-skip logic for a predicate the plan already drove is consistent between `drive()` and
+  `run()`, including two predicates on one index. Clean.
+- **Renderer/GroupView** (materialized aggregation) — the replace-idempotent fold makes the
+  subscribe-then-sweep bootstrap genuinely race-free (double-application is a no-op); `addTotal`
+  re-keys the ranked surface by (total, group) correctly, zero totals leave both maps, `top(k)`
+  walks the order-statistics ranks with no off-by-one. Clean apart from R-1 (the error path).
+- **Brine** (adaptive read-through cache) — coherence rides the tail under the same lock as reads;
+  the documented commit→tail staleness window is the only staleness, and the tail invalidation
+  always reconciles it. One note, not filed (situational and cross-module): `idOf` assigns a
+  permanent dense id per key and is never trimmed, so a cache over an unbounded key universe grows
+  without bound — but the evolution loop holds per-id state too, so this is an architectural
+  bounded-universe assumption rather than a local leak Brine can fix alone.
+- **PitBoss** (fleet conductor) — deliberately not a consensus system (documented non-goals);
+  `promote` captures the dir before `close()`, `rebootstrap` and `tick` handle the gapped-replica
+  path, duplicate replica names are rejected. Clean.
+
 ## Still open
 
-The eleventh pass has only just begun. SmokeHouse core had one real finding (SH-1). The other three
-territories — Carver/Renderer/Brine/PitBoss; Rub/Sizzle; the WholeHog wiring sweep — are un-hunted.
+Two territories un-hunted: **Rub/Sizzle** (observability + chaos) and the **WholeHog wiring sweep**
+(the composition seams). SmokeHouse core has more surface than SH-1 if a deeper cut is wanted.
