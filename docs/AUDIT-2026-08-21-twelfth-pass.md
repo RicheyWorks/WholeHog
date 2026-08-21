@@ -56,8 +56,32 @@ fix. SmokeHouse 77 green, javadoc clean.
   sizes, and fails loudly on a short stream; `lagSequence`/`awaitCaughtUp` use the tail-sequence
   arithmetic correctly.
 
+## WP-1 · S3 · FIXED — OP_COUNT_RANGE wrote REPLY_VALUE before computing, breaking the S1w discipline
+
+The tenth pass's wire-framing ADR (S1w) made the rule "materialize the whole reply before writing any
+reply byte," so that a failure produces a clean `REPLY_ERROR` the client reads in the reply slot
+rather than a half-written value the error trails. OP_RANGE keeps it (it builds the record list first,
+then writes `REPLY_VALUE` + count + records). **OP_COUNT_RANGE and OP_SIZE did not** — they wrote
+`REPLY_VALUE` and *then* called the value-producing method. `execute()` turns a thrown
+`RuntimeException` into a `REPLY_ERROR`, but it cannot un-write the `REPLY_VALUE` byte already sent, so
+the error lands *after* it and the client — reading `REPLY_VALUE`, then parsing the error's bytes as
+an int — desyncs for every later request on that session.
+
+`store.size()` cannot throw, so OP_SIZE was only latently wrong; but `store.countRange` runs the
+store's **comparator**, which a caller supplies and which may reject incomparable keys — so
+OP_COUNT_RANGE was a live desync under a throwing comparator. Fix: both ops now compute the value into
+a local before writing `REPLY_VALUE`, matching OP_RANGE. A refused count is now a clean, recoverable
+`REPLY_ERROR` and the session stays aligned.
+
+**Probe:** `SmokeSignalTest.aRefusedCountRangeKeepsTheSessionAligned` — a store whose comparator throws
+on a poison key makes the server's `countRange` throw; the client's `countRange` must surface an
+`IOException` AND every later request (get, size, put) must still work. It fails on the unfixed op
+(the session desyncs after the poisoned count) and passes with the fix. SmokeSignal 12 green, javadoc
+clean.
+
 ## Still open
 
-SmokeHouse core still has surface if wanted: the wire protocol internals beyond the tenth pass's
-framing ADR, the CSRBT index-tier selection path, and the pilot/auto-compaction cost model. Otherwise
-the ecosystem has now had eleven engines hunted across twelve passes.
+SmokeHouse core is now hunted deeply enough that the remaining surface is thin: the CSRBT index-tier
+selection path and the pilot's cost model are the last named seams. Across twelve passes the whole
+fourteen-engine ecosystem has been swept, most of it more than once — the tenth pass's 26 candidates,
+then SH-1 / R-1 / W-1 (eleventh) and RP-1 / WP-1 (twelfth), every finding probe-verified.
