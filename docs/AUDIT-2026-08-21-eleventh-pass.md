@@ -98,7 +98,43 @@ with the fix. Renderer 6 green, javadoc clean.
   `promote` captures the dir before `close()`, `rebootstrap` and `tick` handle the gapped-replica
   path, duplicate replica names are rejected. Clean.
 
-## Still open
+## W-1 · S3 · FIXED — the Organism constructor leaked every resource on a partial build (WholeHog)
 
-Two territories un-hunted: **Rub/Sizzle** (observability + chaos) and the **WholeHog wiring sweep**
-(the composition seams). SmokeHouse core has more surface than SH-1 if a deeper cut is wanted.
+The composition root opens about a dozen live resources in sequence — a store (with its tail
+thread), a Carver, a Renderer with a tail-subscribed view, a Brine cache subscribed to the tail, a
+PitBoss (a replication server plus a live replica), a DryAge vault, a Sizzle-wrapped write seam, a
+Twine holding the journal-dir lock, a wire server socket, and two Rub observers. The constructor had
+no guard: if any step threw, it completed abruptly and the caller received no reference to close what
+had already opened, so a partial build leaked everything before the failure — a bound server socket,
+a running replica, tail subscriptions folding forever, the store's threads. This is R-1's class of
+bug at the composition level, and higher-impact. Fix: the build runs under a `try` whose `finally`
+calls `unwindPartialBuild()` on failure, closing the opened resources in reverse (reading the fields,
+which are `null` until assigned, so unopened organs are skipped; every close swallowed so cleanup
+can't mask the original failure) — the same discipline as the leaf engines.
+
+**Probe:** `OrganismTest.aFailedBuildUnwindsItsHalfBuiltResources` — a pre-existing
+`journal/twine.lock` **directory** forces `Twine.over` to fail at construction, after the store,
+renderer, Brine, and PitBoss are open. The proof is the replication layer's named threads
+(`smokehouse-repl*`): a leaked PitBoss leaves its acceptor and the replica's apply thread alive, so
+the count never returns to baseline. It fails on the unfixed constructor and passes with the fix.
+(POSIX has no store-directory lock and open files stay deletable, so the leaked file handles alone
+are invisible — the thread count is the deterministic observable.) WholeHog composite 14 green,
+javadoc clean.
+
+## Examined and found sound — Rub/Sizzle
+
+- **Rub / Vitals** (observability) — the meter reads counters after the gauge so it never lies low
+  (documented), `pulse()` takes the derivative of the two newest retained ticks in the right order,
+  `since()` refuses swapped samples, and the derived ratios are computed, never stored. Clean.
+- **Sizzle / ChaosPlan** (chaos) — the op counter advances even on an injected crash (the honest
+  mid-apply model, so a retry gets past a once-at fault by op-index uniqueness), the probability rule
+  is a pure splitmix64 hash of `(seed, op)` with correct `[0,1)` boundaries (the earlier
+  `java.util.Random` correlation is gone), and `and()`/`withLatencyMillis` compose cleanly. Clean.
+
+## Eleventh pass — status
+
+Three territories hunted: **SmokeHouse core** (SH-1), the **Carver/Renderer/Brine/PitBoss row**
+(R-1), and now **Rub/Sizzle + the WholeHog wiring sweep** (W-1) — three real findings, each
+probe-verified, plus clean bills for the engines that held up. The un-hunted surface remaining is a
+**deeper cut into SmokeHouse core** (IndexedStore's fan-out, replication's apply path, the wire
+protocol beyond the tenth pass's framing ADR) if a twelfth pass is wanted.

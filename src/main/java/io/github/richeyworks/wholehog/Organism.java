@@ -117,6 +117,16 @@ public final class Organism implements Closeable {
     public Organism(Path root, long seed, ChaosPlan writeChaos) throws IOException {
         Objects.requireNonNull(writeChaos, "writeChaos");
         Files.createDirectories(root);
+        // Eleventh-pass W-1: the organism opens a dozen live resources — a store with its tail
+        // thread, two tail-subscribing views/caches, a replication server and a replica, a
+        // journal-dir lock, a wire server socket, two observers. If any step below throws, the
+        // constructor completes abruptly and the caller gets no reference to close what already
+        // opened — so a partial build used to leak every earlier resource (a bound server socket,
+        // a live replica, tail subscriptions folding forever). Build under a guard that unwinds
+        // what opened, in reverse, on any failure — the same "leave no dangling resource on the
+        // error path" discipline the leaf engines keep (DryAge D1/D2, Jerky, Renderer R-1).
+        boolean built = false;
+        try {
         this.indexed = IndexedStore.open(root.resolve("store"), options())
                 .secondary(ATTR, Comparator.<Integer>naturalOrder(), Organism::attrOf)
                 .interval(SPAN, Organism::startOf, Organism::endOf)
@@ -177,6 +187,40 @@ public final class Organism implements Closeable {
         // metering the replication feed as it applies — pure composition, Replica.store() is
         // public and a store is a store.
         this.replicaRub = Rub.over(pitBoss.replica("exhibit").store());
+            built = true;
+        } finally {
+            if (!built) {
+                unwindPartialBuild();
+            }
+        }
+    }
+
+    /**
+     * Best-effort teardown of a partially-constructed organism (W-1). Closes, in reverse of the
+     * build, whichever resources were opened before the failure — read from the fields, which are
+     * their default {@code null} until assigned, so an unopened resource is simply skipped. Every
+     * close is swallowed: cleanup runs while an exception is already propagating, and one organ's
+     * refusal to close must not mask the original failure or strand the others.
+     */
+    private void unwindPartialBuild() {
+        closeQuietly(replicaRub);
+        closeQuietly(rub);
+        closeQuietly(wireServer);
+        closeQuietly(twine);
+        closeQuietly(brine);
+        closeQuietly(renderer);
+        closeQuietly(pitBoss);
+        closeQuietly(indexed);
+    }
+
+    private static void closeQuietly(AutoCloseable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception ignored) {
+                // best-effort: the build is already failing
+            }
+        }
     }
 
     // ── The organs, exposed for tests and the exhibit ────────────────────────────

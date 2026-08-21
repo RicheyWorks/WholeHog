@@ -418,4 +418,40 @@ class OrganismTest {
             assertEquals(5, revived.byAttr().groups(), "the materialized view replayed with the store");
         }
     }
+
+    @Test
+    void aFailedBuildUnwindsItsHalfBuiltResources(@TempDir Path root) throws Exception {
+        // Eleventh-pass W-1: force the constructor to fail AT the twine step — a pre-existing
+        // journal/twine.lock DIRECTORY makes Twine.over's FileChannel.open(twine.lock, WRITE) fail,
+        // after the store, the renderer, Brine, and PitBoss (a replication server + a live replica)
+        // are already open. Before the fix the constructor threw without closing any of them, and
+        // the caller had no reference to do it — so the replication server's acceptor thread and the
+        // replica's apply thread (both named "smokehouse-repl*") leaked, alive forever. That thread
+        // leak is the deterministic, observable proof (POSIX has no store-dir lock and open files
+        // stay deletable, so the file handles alone are invisible).
+        java.nio.file.Files.createDirectories(root.resolve("journal").resolve("twine.lock"));
+        int before = smokehouseReplThreads();
+
+        assertThrows(IOException.class, () -> new Organism(root, 1L),
+                "the twine.lock directory makes construction fail at the twine step");
+
+        // With the fix, the failed build closed pitBoss (stopping the acceptor + replica threads);
+        // give them a moment to wind down. Without it, they stay alive and the count never returns.
+        for (int i = 0; i < 300 && smokehouseReplThreads() > before; i++) {
+            Thread.sleep(10);
+        }
+        assertEquals(before, smokehouseReplThreads(),
+                "a failed build must not leak the replication server + replica threads it started");
+    }
+
+    /** Live threads the replication layer names "smokehouse-repl*" — acceptor, client, replica-apply. */
+    private static int smokehouseReplThreads() {
+        int n = 0;
+        for (Thread t : Thread.getAllStackTraces().keySet()) {
+            if (t.isAlive() && t.getName().startsWith("smokehouse-repl")) {
+                n++;
+            }
+        }
+        return n;
+    }
 }
