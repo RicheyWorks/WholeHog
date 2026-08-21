@@ -379,6 +379,7 @@ public final class Organism implements Closeable {
         rub.close();                                           // detaches the tail observer only
         replicaRub.close();                                    // and the fleet's observer
         wireServer.close();
+        twine.close();                                         // releases the journal-dir lock (T1)
         brine.close();
         renderer.close();
         pitBoss.close();
