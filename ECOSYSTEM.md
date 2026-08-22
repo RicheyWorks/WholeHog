@@ -92,14 +92,24 @@ flowchart LR
 
 To make it concrete — the kinds of things this engine is the *foundation* for:
 
-- A **to-do or notes app** that never loses your data, even if it crashes mid‑save.
-- An **inventory or point-of-sale system** that can answer "what were my top sellers last
-  Tuesday?" and show you the books exactly as they stood on any past day.
-- A **leaderboard or scoreboard** that stays ranked and up-to-date live as scores pour in.
-- A **personal ledger** where every change is atomic and every past state is recoverable.
+- A **crash-proof notes or journaling app** that never loses your work, and can pull back any
+  earlier version of a note.
+- A **small shop's inventory & point of sale** that answers "what were my top sellers last
+  Tuesday?" and shows the books exactly as they stood on any past day.
+- A **live game leaderboard** that stays ranked — top-10, your rank, percentiles — as scores flood in.
+- A **personal finance ledger** where a multi-account transaction is all-or-nothing and every past
+  balance is recoverable.
+- A **sensor / IoT logger** that swallows a high volume of readings and rolls them into live
+  averages, with backup copies kept in sync.
+- A **local-first app backend** — a real database engine entirely on one machine, no cloud.
+- An **audit or compliance trail** that's append-only, integrity-checked, and replayable to any moment.
+- A **learning lab** for how databases actually work — run it, read the reasoning, crash it, watch it recover.
 
-You'd write the app *on top* of these engines. They're the trustworthy floor; the app is the
-house you build on it.
+You'd write the app *on top* of these engines. They're the trustworthy floor; the app is the house
+you build on it.
+
+**Want the details?** [**USE-CASES.md**](USE-CASES.md) takes each of these apart — what it needs,
+which engines carry it, and a short sketch of how they fit together.
 
 ---
 
