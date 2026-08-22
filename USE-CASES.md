@@ -3,7 +3,7 @@
 *Concrete things this ecosystem is the foundation for — and exactly which engines carry each one.*
 
 New here? Start with the [plain-English overview](ECOSYSTEM.md) first. This page goes one level
-deeper: eight real applications, what each one actually needs, and how the fourteen engines add up
+deeper: nine real applications, what each one actually needs, and how the fourteen engines add up
 to it. The code sketches use WholeHog's composed `Organism` (or a single engine where that's
 clearer) — they're illustrative, meant to show the shape, not to copy-paste into production.
 
@@ -157,6 +157,39 @@ try (Organism o = new Organism(root, seed, ChaosPlan.crashOnceAtOp(3))) {  // cr
 }   // …reopen: the journal replays and the batch landed exactly once
 ```
 
+## 9. A field-ecology teaching & analysis lab
+
+**For:** ecology and biology students, TAs, professors, and field researchers.
+
+**What it needs:** the standard field instruments (diversity, survivorship, dispersion, island
+turnover, genetics), a way to bring your *own* field data with no coding, numbers reproducible
+enough to cite, and clean output to drop into a lab report.
+
+**How the smokehouse does it:** [CSRBT](https://github.com/RicheyWorks/CSRBT) carries a
+**community-ecology layer** built on one idea — *a data structure under a workload behaves like a
+habitat under an ecology.* Keys are species, how often a key is touched is that species' abundance,
+inserts and removes are births and deaths, and time is counted in operations, so every number
+reproduces exactly. On that footing it runs the real instruments: Shannon / Simpson / Hill
+diversity, Deevey survivorship curves, Levins metapopulation dynamics, Morisita quadrat dispersion,
+MacArthur–Wilson island turnover, Hardy–Weinberg, Punnett squares, mark–recapture, Newick
+cladograms, dichotomous keys, and a flashcard trainer — each tested against hand-computed oracles.
+
+The best part for a classroom: the **browser Workbench** ([`docs/ecology-lab.html`](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ecology-lab.html))
+runs all of it with **no install** — paste field counts (a spreadsheet paste or tally marks both
+work) or a genotype census, compare two sites, run the mark–recapture calculator, build a Punnett
+square or a cladogram — and it narrates every number in plain language ("*uneven — a few hot keys
+carry most of the traffic*"). Want a graded experiment? Write a plain-text `.eco` protocol that
+commits to a hypothesis *before* the run; the engine grades it and exports CSVs (Excel/Sheets/R-ready)
+and a print-friendly report to hand in. The whole thing prints clean for a lab report.
+
+*Where to look:* the [field guide](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ECOLOGY-FIELD-GUIDE.md)
+(plain-language, biology-first), the [essay](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ESSAY-the-ecology-of-a-tree.md)
+(the whole story), and the Workbench page itself.
+
+*Honest frame:* the instruments measure a data structure with genuine field methods, and they
+narrate *your* entered field data with those same methods — a teaching and analysis tool, not a
+claim that a binary tree is literally a meadow.
+
 ---
 
 ## Picking engines by what you need
@@ -169,6 +202,7 @@ A quick index — the need on the left, the engine that answers it on the right:
 | Several writes as one all-or-nothing change | [Twine](https://github.com/RicheyWorks/Twine) |
 | "Show me the data as it was back then" | [DryAge](https://github.com/RicheyWorks/DryAge) |
 | Rankings, top-k, percentiles, medians | [CSRBT](https://github.com/RicheyWorks/CSRBT) order statistics |
+| Field-ecology instruments for teaching or field data | [CSRBT](https://github.com/RicheyWorks/CSRBT)'s [ecology layer](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ECOLOGY-FIELD-GUIDE.md) |
 | Live running totals and dashboards | [Renderer](https://github.com/RicheyWorks/Renderer) |
 | The cheapest way to answer a query | [Carver](https://github.com/RicheyWorks/Carver) |
 | A fast in-memory cache | [Brine](https://github.com/RicheyWorks/Brine) |

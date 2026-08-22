@@ -113,7 +113,7 @@ Engines 13–14: [Rub](https://github.com/RicheyWorks/Rub) (observability) · [S
 
 > *“Walk me through installing Java 17 and running `RicheyWorks/WholeHog` from GitHub, one step at a time. I'm on Windows (or Mac) and I've never done this — keep it simple.”*
 
-It will take you the rest of the way. The full newcomer guide lives in [ECOSYSTEM.md](https://github.com/RicheyWorks/WholeHog/blob/main/ECOSYSTEM.md).
+It will take you the rest of the way. New to all this? The step-by-step **[QUICKSTART.md](QUICKSTART.md)** takes you from zero to a running demo in about ten minutes (with exactly what you'll see), and the full newcomer guide lives in [ECOSYSTEM.md](https://github.com/RicheyWorks/WholeHog/blob/main/ECOSYSTEM.md).
 
 
 ```bash

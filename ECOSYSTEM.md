@@ -104,6 +104,8 @@ To make it concrete — the kinds of things this engine is the *foundation* for:
 - A **local-first app backend** — a real database engine entirely on one machine, no cloud.
 - An **audit or compliance trail** that's append-only, integrity-checked, and replayable to any moment.
 - A **learning lab** for how databases actually work — run it, read the reasoning, crash it, watch it recover.
+- A **field-ecology teaching & analysis lab** — diversity indices, survivorship curves, quadrat
+  dispersion, genetics — that also narrates *your own* field data, right in the browser, with no install.
 
 You'd write the app *on top* of these engines. They're the trustworthy floor; the app is the house
 you build on it.
@@ -117,7 +119,9 @@ which engines carry it, and a short sketch of how they fit together.
 
 Here's the honest truth: this is a developer project, so "running it" means installing a couple of
 free tools and typing a command or two. That sounds scary if you've never done it. **The easiest
-path today is to let an AI assistant walk you through it.** Here's exactly how.
+path today is to let an AI assistant walk you through it** — or follow the step-by-step
+**[QUICKSTART.md](QUICKSTART.md)** (about ten minutes, with exactly what you'll see when it works).
+Here's the short version.
 
 ### The easy way: have an AI set it up with you
 
