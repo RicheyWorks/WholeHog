@@ -183,7 +183,7 @@ commits to a hypothesis *before* the run; the engine grades it and exports CSVs 
 and a print-friendly report to hand in. The whole thing prints clean for a lab report.
 
 *Where to look:* the [Field & Lab Manual](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ecology-lab-manual.html)
-(five ready-to-run, print-first labs — behavior, genetics, biodiversity, populations, evolution — each
+(six ready-to-run, print-first labs — behavior, genetics, biodiversity, populations, evolution, island biogeography — each
 built on the workbench), the [field guide](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ECOLOGY-FIELD-GUIDE.md)
 (plain-language, biology-first), the [essay](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ESSAY-the-ecology-of-a-tree.md)
 (the whole story), and the Workbench page itself.
