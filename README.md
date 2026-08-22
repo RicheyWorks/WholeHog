@@ -4,6 +4,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Java 17](https://img.shields.io/badge/Java-17-orange.svg)](https://adoptium.net/)
 
+> **New here — or not a coder?** Start with the [plain-English guide to the whole ecosystem →](https://github.com/RicheyWorks/WholeHog/blob/main/ECOSYSTEM.md): what all of this is, what you'd actually use it for, and how to get it running even if you've never written a line of code.
+
+
 Engine twelve of the ecosystem: **the integration organism** — the whole hog. Thirteen engines
 are each oracle-tested in isolation; WholeHog is where "in isolation" stops being the
 qualifier. One store, every engine attached at once, one composed lifecycle, one oracle.
@@ -78,6 +81,25 @@ Discoveries this engine has forced upstream, on the record:
    without knowing Twine exists. The oracle proves the net effect lands exactly once,
    everywhere.
 
+## How the pieces connect
+
+Intake sorts, the index orders, the store keeps — then every other engine is a consumer that reads
+the store. WholeHog is where all fourteen are wired together and asserted as one organism.
+
+```mermaid
+flowchart LR
+    SBS["SuperBeefSort<br/>intake"] --> CSRBT["CSRBT<br/>index"] --> SH["SmokeHouse<br/>the store"]
+    SH --> CV["Carver<br/>read planner"]
+    SH --> RN["Renderer<br/>live views"]
+    SH --> BR["Brine<br/>cache"]
+    SH --> PB["PitBoss<br/>replicas"]
+    SH --> DA["DryAge<br/>time travel"] --> JK["Jerky<br/>cold archive"]
+    SH --> TW["Twine<br/>atomic batches"]
+    SH --> SS["SmokeSignal<br/>the wire"]
+    SH --> RB["Rub<br/>health"]
+    WH["WholeHog — proves all fourteen work as one"]
+```
+
 ## The ecosystem
 
 Engines 1–6: [CSRBT](https://github.com/RicheyWorks/CSRBT) (index) · [SuperBeefSort](https://github.com/RicheyWorks/SuperBeefSort) (intake) · [SmokeHouse](https://github.com/RicheyWorks/SmokeHouse) (store) · [Carver](https://github.com/RicheyWorks/Carver) (read planner) · [Renderer](https://github.com/RicheyWorks/Renderer) (materialized views) · [Brine](https://github.com/RicheyWorks/Brine) (adaptive cache).
@@ -86,6 +108,13 @@ Engine 12: **WholeHog** (this repo) — all of them, at once.
 Engines 13–14: [Rub](https://github.com/RicheyWorks/Rub) (observability) · [Sizzle](https://github.com/RicheyWorks/Sizzle) (chaos) — composed here as the fourth tail subscriber and the write-path chaos seam.
 
 ## Build
+
+**Never set up a project like this before?** You don't need to know Java or Gradle. Open [Claude](https://claude.ai) or ChatGPT and paste:
+
+> *“Walk me through installing Java 17 and running `RicheyWorks/WholeHog` from GitHub, one step at a time. I'm on Windows (or Mac) and I've never done this — keep it simple.”*
+
+It will take you the rest of the way. The full newcomer guide lives in [ECOSYSTEM.md](https://github.com/RicheyWorks/WholeHog/blob/main/ECOSYSTEM.md).
+
 
 ```bash
 # Requires ALL ecosystem repos cloned as siblings (this is the point)
