@@ -203,7 +203,24 @@ family. Thresholds are placeholders — it says so — and your day exports as `
 hunt like a program — weighted trait scoring plant by plant with phenotype notes, a ranked selection
 board whose readout is the real quantitative-genetics number (selection differential S, with the
 R = h²·S caveat stated honestly), and a segregation checker that χ²-tests a binary trait against the
-classic ratios (3:1, 1:1, 9:7…). The run persists in the browser and exports to the breeding log.
+classic ratios (3:1, 1:1, 9:7…). Clone programs get their own layer: promote a keeper to a **mother
+plant**, plan next season's crosses (♀ × ♂, with the clone-vs-seed-run distinction stated plainly),
+and it all rides into the export. The run persists in the browser and exports to the breeding log.
+
+**And out in the field:** [Field Notebook](https://github.com/RicheyWorks/CSRBT/blob/main/docs/field-notebook.html)
+is the tablet data-entry app the others lean on — tap-to-tally ethograms with a scan timer, quadrats,
+species counts, and mark–recapture, with live diversity readings, long-press rename on every tally
+card, and exports (`.eco` + CSV) stamped with site, observer, and date so the data sheet stands on
+its own in a lab report.
+
+**And for a class that learns by playing:** two toys that teach real method by letting you break
+things. [Field Season](https://github.com/RicheyWorks/CSRBT/blob/main/docs/field-season.html) hides a
+meadow behind twelve field days and weather, then peer-reviews your report — same season number, same
+meadow, so a whole class can compare sampling strategies fairly. [Food Web
+Builder](https://github.com/RicheyWorks/CSRBT/blob/main/docs/food-web.html) lets you tap a food web
+into being — food first, then eater — computes the trophic pyramid live, and answers the question
+every textbook only asserts: long-press a species, run the knockout test, and watch which others
+starve. Keystones, found by breaking things.
 
 ---
 

@@ -106,6 +106,10 @@ To make it concrete — the kinds of things this engine is the *foundation* for:
 - A **learning lab** for how databases actually work — run it, read the reasoning, crash it, watch it recover.
 - A **field-ecology teaching & analysis lab** — diversity indices, survivorship curves, quadrat
   dispersion, genetics — that also narrates *your own* field data, right in the browser, with no install.
+- A **tablet field kit** for people who never open the code at all: tap-to-tally data collection for
+  field biology, pest scouting and rotation checks for growers, a selection bench for plant breeders,
+  a sampling game with a hidden meadow, and a food-web builder with a knockout test — all from the
+  [science-kit hub](https://github.com/RicheyWorks/CSRBT/blob/main/docs/ecology.html), all printable.
 
 You'd write the app *on top* of these engines. They're the trustworthy floor; the app is the house
 you build on it.
