@@ -192,6 +192,19 @@ built on the workbench), the [field guide](https://github.com/RicheyWorks/CSRBT/
 narrate *your* entered field data with those same methods — a teaching and analysis tool, not a
 claim that a binary tree is literally a meadow.
 
+**And for growers:** the same math points at a farm. [Farm Scout](https://github.com/RicheyWorks/CSRBT/blob/main/docs/farm-scout.html)
+is a tablet companion for the field row: IPM pest scouting (your counts vs. an action threshold,
+with the dispersion reading turned into a *spot-treat vs. whole-block* verdict), a pollinator
+health count, a germination tester with a sowing calculator, and a crop-rotation checker by plant
+family. Thresholds are placeholders — it says so — and your day exports as `.eco` lines.
+
+**And for plant breeders** (fruit, vegetables, hops, hemp/cannabis where legal):
+[Pheno Tracker](https://github.com/RicheyWorks/CSRBT/blob/main/docs/pheno-tracker.html) runs a pheno
+hunt like a program — weighted trait scoring plant by plant with phenotype notes, a ranked selection
+board whose readout is the real quantitative-genetics number (selection differential S, with the
+R = h²·S caveat stated honestly), and a segregation checker that χ²-tests a binary trait against the
+classic ratios (3:1, 1:1, 9:7…). The run persists in the browser and exports to the breeding log.
+
 ---
 
 ## Picking engines by what you need
