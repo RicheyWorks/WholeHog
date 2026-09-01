@@ -69,6 +69,8 @@ final class HarnessConsoleTest {
         assertTrue(h("batch").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
         assertTrue(h("batch x 1").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
         assertTrue(h("put 1 1 1 1 teleport").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+        assertTrue(h("put 1 1 9 1 wire").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""),
+                "start > end is refused before any route sees it, so both routes answer alike");
         assertTrue(h("coldscan 3").startsWith("{\"ok\":false,\"code\":\"not_found\""));
         assertTrue(h("observe").contains("\"size\":0,\"tailSequence\":0,"),
                 "no refused write reached the store");
@@ -135,6 +137,9 @@ final class HarnessConsoleTest {
             String crash = r.answer("batch p 1 1 1 1 | p 2 1 1 1 | p 3 1 1 1");
             assertTrue(crash.startsWith("{\"ok\":false,\"code\":\"failed\",\"why\":\"Crash:"), crash);
             assertTrue(r.answer("observe").contains("\"chaosCrashes\":1"));
+            String wedged = r.answer("batch p 4 1 1 1");
+            assertTrue(wedged.startsWith("{\"ok\":false,\"code\":\"conflict\""),
+                    "Twine's one-batch-at-a-time is the organism's rule, not its failure: " + wedged);
             String clean = r.answer("restart");
             assertTrue(clean.contains("\"chaos\":\"none\"") && clean.contains("\"journalReplays\":1"), clean);
             assertEquals("{\"ok\":true,\"count\":3,\"via\":\"direct\"}", r.answer("count 0 100"));

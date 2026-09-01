@@ -132,6 +132,7 @@ a test runner or a script through exactly the four operations the kit's pages al
 `CSRBT/tools/verify/verify_organism.py` drives it through that gateway only: 284 checks,
 including a differential oracle over every write route (direct, wire, Twine batch) and, since
 ADR-113, one oracle per engine — 33 actions, every organ by its own surface, chaos armed by
-`restart` (close + reopen at the same root under a `ChaosPlan`: the recovery road).
+`restart` (close + reopen at the same root under a `ChaosPlan`: the recovery road). ADR-114 adds
+the first robot, `CSRBT/tools/organism_walk.py`, which drives all of it from the manifest alone.
 
 Java 17+, Gradle 9.5.1 (bundled wrapper). MIT license.

@@ -166,6 +166,11 @@ public final class HarnessConsole {
         } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
             // A rank outside [1, size] is the caller's argument, not the organism failing.
             return refuse("invalid_argument", e.getMessage());
+        } catch (IllegalStateException e) {
+            // Twine's "a committed batch is still applying; one batch at a time" (tenth-pass
+            // T4): the organism refusing by its own rule, not the organism failing. The first
+            // robot (ADR-114) filed it under failed; recover() is the way through.
+            return refuse("conflict", e.getMessage());
         } catch (Exception e) {
             return refuse("failed", e.getClass().getSimpleName() + ": " + e.getMessage());
         }
@@ -222,7 +227,9 @@ public final class HarnessConsole {
         StringBuilder b = new StringBuilder("{\"ok\":true,\"ready\":true");
         b.append(",\"size\":").append(o.primary().size());
         b.append(",\"tailSequence\":").append(o.primary().tailSequence());
-        b.append(",\"generations\":").append(o.vault().generations().size());
+        List<Long> gens = o.vault().generations();
+        b.append(",\"generations\":").append(gens.size());
+        b.append(",\"generationIds\":").append(gens);
         b.append(",\"wirePort\":").append(o.wirePort());
         b.append(",\"watchedEvents\":").append(o.watchedEvents());
         b.append(",\"chaosCrashes\":").append(o.chaosCrashes());
@@ -270,8 +277,7 @@ public final class HarnessConsole {
 
     String put(String[] t) throws IOException {
         long k = longArg(t, 1);
-        String v = Organism.value(intArg(t, 2, 0, 999), intArg(t, 3, 0, 99_999),
-                intArg(t, 4, 0, 99_999));
+        String v = triple(t, 2);
         String via = via(t, 5);
         if ("wire".equals(via)) {
             try (SmokeSignalClient<Long, String> w = o.wire()) {
@@ -310,8 +316,7 @@ public final class HarnessConsole {
                 if (i + 4 >= t.length) {
                     throw new IllegalArgumentException("batch put needs K A S E");
                 }
-                b.put(longArg(t, i + 1), Organism.value(intArg(t, i + 2, 0, 999),
-                        intArg(t, i + 3, 0, 99_999), intArg(t, i + 4, 0, 99_999)));
+                b.put(longArg(t, i + 1), triple(t, i + 2));
                 i += 5;
             } else if ("d".equals(t[i])) {
                 b.delete(longArg(t, i + 1));
@@ -397,6 +402,12 @@ public final class HarnessConsole {
             }
             case "nth": {
                 int r = intArg(t, 2, 1, Integer.MAX_VALUE);          // ranks are 1-based, like the store's
+                if (r > p.size()) {
+                    // Checked here so both routes answer alike: direct threw IndexOutOfBounds
+                    // (mapped to invalid_argument); the wire wrapped the server's refusal in an
+                    // IOException (failed). Same input, two codes -- the first robot's finding.
+                    throw new IllegalArgumentException("nth rank " + r + " out of bounds [1," + p.size() + "]");
+                }
                 answer = w ? wire(c -> c.nthKey(r)) : p.nthKey(r);
                 break;
             }
@@ -657,6 +668,8 @@ public final class HarnessConsole {
     String pulse() {
         Vitals.Pulse p = o.rub().pulse();
         if (p == null) {
+            // ok: the read succeeded and the answer is "no pulse yet". The first robot filed
+            // an ok:false here under failed, and a reading that does not exist is not a failure.
             return "{\"ok\":true,\"pulse\":null,\"why\":\"fewer than two ticks\"}";
         }
         return "{\"ok\":true,\"pulse\":{\"opsElapsed\":" + p.opsElapsed() + ",\"putsObserved\":"
@@ -687,6 +700,20 @@ public final class HarnessConsole {
     }
 
     // ── emission: hand-written JSON, because nothing here is free text ──────
+
+    /**
+     * The organism's value, validated here before any route sees it. The interval index
+     * refuses start > end; direct, that surfaced as invalid_argument, and over the wire as a
+     * server refusal wrapped in an IOException -- failed. The first robot (ADR-114) found the
+     * same bad input answered with two codes depending on the route it happened to pick.
+     */
+    static String triple(String[] t, int i) {
+        int attr = intArg(t, i, 0, 999), start = intArg(t, i + 1, 0, 99_999), end = intArg(t, i + 2, 0, 99_999);
+        if (start > end) {
+            throw new IllegalArgumentException("span start " + start + " > end " + end);
+        }
+        return Organism.value(attr, start, end);
+    }
 
     static String vitals(Vitals v) {
         return "{\"tailSequence\":" + v.tailSequence() + ",\"liveKeys\":" + v.liveKeys()

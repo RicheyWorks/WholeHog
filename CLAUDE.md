@@ -9,7 +9,10 @@ harness: stdin/stdout line protocol, numbers only, no token or policy here — t
 `CSRBT/tools/harness_contract.py`. `./gradlew harnessClasspath` writes the classpath the
 Python plugin (`CSRBT/tools/harness_plugin_organism.py`) launches it with. ADR-113: every engine
 answers by name (33 actions); `restart` closes and reopens the organism at the same root under a
-`ChaosPlan` — chaos stays a constructor seam, driven the way `OrganismTest` drives it. Adding a verb: add
+`ChaosPlan` — chaos stays a constructor seam, driven the way `OrganismTest` drives it. Refusal codes the console maps: `IllegalArgumentException`/`IndexOutOfBounds` → `invalid_argument`,
+`IllegalStateException` (Twine wedged after a crash mid-batch) → `conflict`, anything else → `failed`
+— and cross-field rules (span start ≤ end, nth ≤ size) are checked BEFORE a route, so direct and wire
+answer alike (ADR-114). Adding a verb: add
 it to the console, declare its risk in the plugin's descriptor, and give `verify_organism`
 a check that would fail without it — `CSRBT/tools/mutate_organism.py` is how that is proven.
 
