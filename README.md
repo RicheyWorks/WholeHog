@@ -129,7 +129,9 @@ token, no policy, a seam of the same kind as Twine's sink. The contract that fro
 (token, risk ladder, replay safety, redaction) lives in CSRBT's `tools/harness_contract.py`;
 `python3 tools/harness_stdio.py --target organism` there serves this organism to an AI agent,
 a test runner or a script through exactly the four operations the kit's pages already answer.
-`CSRBT/tools/verify/verify_organism.py` drives it through that gateway only: 234 checks,
-including a differential oracle over every write route (direct, wire, Twine batch).
+`CSRBT/tools/verify/verify_organism.py` drives it through that gateway only: 284 checks,
+including a differential oracle over every write route (direct, wire, Twine batch) and, since
+ADR-113, one oracle per engine — 33 actions, every organ by its own surface, chaos armed by
+`restart` (close + reopen at the same root under a `ChaosPlan`: the recovery road).
 
 Java 17+, Gradle 9.5.1 (bundled wrapper). MIT license.

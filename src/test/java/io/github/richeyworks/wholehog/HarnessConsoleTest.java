@@ -49,10 +49,12 @@ final class HarnessConsoleTest {
         assertEquals("{\"ok\":true,\"key\":7,\"via\":\"wire\"}", h("put 7 4 50 60 wire"));
         assertTrue(h("batch p 9 1 1 2 | d 5 | p 11 2 3 4").startsWith("{\"ok\":true,\"ops\":3,"));
         assertTrue(o.awaitQuiescence(10_000));
-        assertEquals("{\"ok\":true,\"key\":7,\"found\":true,\"value\":{\"attr\":4,\"start\":50,\"end\":60}}",
+        assertEquals("{\"ok\":true,\"key\":7,\"found\":true,\"value\":{\"attr\":4,\"start\":50,\"end\":60},\"via\":\"direct\"}",
                 h("get 7"));
-        assertEquals("{\"ok\":true,\"key\":5,\"found\":false}", h("contains 5"));
-        assertEquals("{\"ok\":true,\"count\":3}", h("count 0 100"));
+        assertEquals(h("get 7").replace("direct", "wire"), h("get 7 wire"), "the wire reads what the store reads");
+        assertEquals("{\"ok\":true,\"key\":5,\"found\":false,\"via\":\"direct\"}", h("contains 5"));
+        assertEquals("{\"ok\":true,\"count\":3,\"via\":\"direct\"}", h("count 0 100"));
+        assertEquals("{\"ok\":true,\"count\":3,\"via\":\"wire\"}", h("count 0 100 wire"));
         String r = h("range 0 100 2");
         assertTrue(r.contains("\"count\":3,\"truncated\":true"), r);
         assertTrue(h("observe").contains("\"size\":3,"));
@@ -86,6 +88,62 @@ final class HarnessConsoleTest {
         assertTrue(p.startsWith("{\"ok\":true,\"generation\":0,\"generations\":1,"), p);
         h("put 3 1 1 1");
         assertEquals("{\"ok\":true,\"generation\":0,\"records\":2}", h("coldscan 0"));
+    }
+
+    @Test
+    void everyEngineAnswersByName() throws Exception {
+        h("put 5 3 100 200");
+        h("put 7 4 50 60 wire");
+        h("put 9 1 500 900");
+        assertTrue(o.awaitQuiescence(10_000));
+        assertEquals("{\"ok\":true,\"kind\":\"median\",\"answer\":7,\"via\":\"wire\"}", h("order median wire"));
+        assertEquals("{\"ok\":true,\"kind\":\"rank\",\"answer\":3,\"via\":\"direct\"}", h("order rank 9"));
+        assertTrue(h("order nth 0").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""),
+                "ranks are 1-based and a bad rank is the caller's, not a crash");
+        assertTrue(h("depth 7").contains("\"live\":true") && h("depth 8").contains("\"live\":false"));
+        assertTrue(h("overlap 55 120 10").contains("\"count\":2"), h("overlap 55 120 10"));
+        assertTrue(h("stab 600 10").contains("\"keys\":[9]"));
+        assertTrue(h("groups 2").startsWith("{\"ok\":true,\"groups\":3,"));
+        h("cacheget 7");
+        assertTrue(h("cacheget 7").contains("\"hit\":true,\"storeRead\":false"));
+        assertTrue(h("fleet").contains("\"lag\":0,\"gapped\":false"));
+        assertTrue(h("replicaget 7").contains("\"found\":true"));
+        assertTrue(h("preserve").contains("\"generation\":0"));
+        h("put 7 9 1 2");
+        assertTrue(h("asof 0 7").contains("\"value\":{\"attr\":4,"), "as-of reads the moment");
+        assertTrue(h("verify 0").endsWith("\"verified\":true}"));
+        assertTrue(h("names 0").contains("\"scan.run\""));
+        assertTrue(h("segments").startsWith("{\"ok\":true,\"segments\":[{"));
+        assertTrue(h("compact").contains("\"garbageAfter\":"));
+        assertEquals("{\"ok\":true,\"replayed\":false,\"journalReplays\":0}", h("recover"));
+        h("tick");
+        assertTrue(h("history").contains("\"liveKeys\":3"));
+        assertTrue(h("retain 1").contains("\"released\":[]"));
+        assertTrue(h("restart").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""),
+                "a console built without a root cannot restart, and says so");
+    }
+
+    @Test
+    void restartUnderChaosThenCleanReplaysTheBatchWhole() throws Exception {
+        o.close();
+        Path organismRoot = root.resolve("organism");
+        HarnessConsole r = new HarnessConsole(new Organism(organismRoot, 11), root.resolve("archive"),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                organismRoot, 11);
+        try {
+            assertTrue(r.answer("restart once:2").contains("\"chaos\":\"once:2\""));
+            String crash = r.answer("batch p 1 1 1 1 | p 2 1 1 1 | p 3 1 1 1");
+            assertTrue(crash.startsWith("{\"ok\":false,\"code\":\"failed\",\"why\":\"Crash:"), crash);
+            assertTrue(r.answer("observe").contains("\"chaosCrashes\":1"));
+            String clean = r.answer("restart");
+            assertTrue(clean.contains("\"chaos\":\"none\"") && clean.contains("\"journalReplays\":1"), clean);
+            assertEquals("{\"ok\":true,\"count\":3,\"via\":\"direct\"}", r.answer("count 0 100"));
+            assertTrue(r.answer("restart bogus").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+            assertTrue(r.answer("restart none 9999").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+        } finally {
+            r.close();
+        }
+        o = new Organism(organismRoot, 11);              // so @AfterEach has something to close
     }
 
     @Test

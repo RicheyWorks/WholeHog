@@ -7,7 +7,9 @@ Engine 12: the integration organism. `Organism` wires all eleven engines over on
 `HarnessConsole` (ADR-112, 2026-09-01) is the organism as a target of the CSRBT automation
 harness: stdin/stdout line protocol, numbers only, no token or policy here — those live in
 `CSRBT/tools/harness_contract.py`. `./gradlew harnessClasspath` writes the classpath the
-Python plugin (`CSRBT/tools/harness_plugin_organism.py`) launches it with. Adding a verb: add
+Python plugin (`CSRBT/tools/harness_plugin_organism.py`) launches it with. ADR-113: every engine
+answers by name (33 actions); `restart` closes and reopens the organism at the same root under a
+`ChaosPlan` — chaos stays a constructor seam, driven the way `OrganismTest` drives it. Adding a verb: add
 it to the console, declare its risk in the plugin's descriptor, and give `verify_organism`
 a check that would fail without it — `CSRBT/tools/mutate_organism.py` is how that is proven.
 

@@ -1,6 +1,12 @@
 package io.github.richeyworks.wholehog;
 
+import io.github.richeyworks.brine.Brine;
+import io.github.richeyworks.dryage.DryAge;
+import io.github.richeyworks.jerky.Jerky;
+import io.github.richeyworks.pitboss.PitBoss;
 import io.github.richeyworks.rub.Vitals;
+import io.github.richeyworks.sizzle.ChaosPlan;
+import io.github.richeyworks.smokehouse.SmokeHouse;
 import io.github.richeyworks.smokesignal.SmokeSignalClient;
 import io.github.richeyworks.smokesignal.SmokeSignalServer;
 import io.github.richeyworks.twine.Twine;
@@ -15,6 +21,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * The organism as a harness target (ADR-112, 2026-09-01): one {@link Organism} driven over
@@ -47,6 +54,24 @@ import java.util.Locale;
  *   report   tick   pulse   quiesce MS
  *   preserve                     → preserveAndCure into the console's archive dir
  *   coldscan GEN                 → records in gen-GEN.jerky, counted without resurrection
+ *
+ *   ADR-113 (2026-09-01), every engine's surface:
+ *   get/count/range … [direct|wire]   reads by route, like writes
+ *   order KIND [ARG] [via]       rank K | nth R (1-based) | median | percentile P | first | last | size
+ *   depth K                      CSRBT's realized probe depth (the measuring read)
+ *   overlap LO HI CAP            Carver over the SPAN interval index
+ *   stab POINT CAP
+ *   groups TOPK                  Renderer's fold: group count, top-k attrs with totals
+ *   cacheget K                   Brine: the cache's answer + its stats
+ *   fleet                        PitBoss tick → lag/gapped/rebootstrapped per replica
+ *   replicaget K                 the replica's own store
+ *   rebootstrap                  cold-start the replica mid-life
+ *   generations | asof GEN K | retain N        DryAge
+ *   verify GEN | names GEN       Jerky
+ *   compact | segments           SmokeHouse
+ *   recover | history            Twine journal replay | Rub's sample history
+ *   restart [PLAN] [LATENCY]     close + reopen at the same root; PLAN = none | once:N |
+ *                                every:N | prob:SEED:P (Sizzle), LATENCY ms per write op
  *   quit
  * </pre>
  *
@@ -61,14 +86,34 @@ public final class HarnessConsole {
     static final int RANGE_CAP_MAX = 1000;
     static final int QUIESCE_MS_MAX = 30_000;
 
-    private final Organism o;
+    static final String REPLICA = "exhibit";
+
+    private Organism o;
     private final Path archive;
     private final PrintStream out;
+    private final Path organismRoot;
+    private final long seed;
+    private String chaos = "none";
+    private int restarts;
+    private boolean replicaObserverDetached;
 
     HarnessConsole(Organism o, Path archive, PrintStream out) {
+        this(o, archive, out, null, 0);
+    }
+
+    HarnessConsole(Organism o, Path archive, PrintStream out, Path organismRoot, long seed) {
         this.o = o;
         this.archive = archive;
         this.out = out;
+        this.organismRoot = organismRoot;
+        this.seed = seed;
+    }
+
+    /** Close whatever is open. Idempotent, like the organism's own close. */
+    void close() throws IOException {
+        if (o != null) {
+            o.close();
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -85,11 +130,15 @@ public final class HarnessConsole {
             root = Files.createTempDirectory("wholehog-harness");
         }
         PrintStream out = new PrintStream(System.out, true, StandardCharsets.UTF_8);
-        try (Organism o = new Organism(root.resolve("organism"), seed)) {
-            HarnessConsole c = new HarnessConsole(o, root.resolve("archive"), out);
+        Path organismRoot = root.resolve("organism");
+        HarnessConsole c = new HarnessConsole(new Organism(organismRoot, seed),
+                root.resolve("archive"), out, organismRoot, seed);
+        try {
             out.println("{\"ok\":true,\"ready\":true,\"protocol\":\"" + PROTOCOL
-                    + "\",\"seed\":" + seed + ",\"wirePort\":" + o.wirePort() + "}");
+                    + "\",\"seed\":" + seed + ",\"wirePort\":" + c.o.wirePort() + "}");
             c.serve(new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8)));
+        } finally {
+            c.close();
         }
     }
 
@@ -114,7 +163,8 @@ public final class HarnessConsole {
             return handle(line.split("\\s+"));
         } catch (NumberFormatException e) {
             return refuse("invalid_argument", "not a number: " + e.getMessage());
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+            // A rank outside [1, size] is the caller's argument, not the organism failing.
             return refuse("invalid_argument", e.getMessage());
         } catch (Exception e) {
             return refuse("failed", e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -130,11 +180,30 @@ public final class HarnessConsole {
             case "put":      return put(t);
             case "delete":   return delete(t);
             case "batch":    return batch(t);
-            case "get":      return get(longArg(t, 1));
-            case "contains": return contains(longArg(t, 1));
-            case "range":    return range(longArg(t, 1), longArg(t, 2), intArg(t, 3, 1, RANGE_CAP_MAX));
-            case "count":    return count(longArg(t, 1), longArg(t, 2));
+            case "get":      return get(longArg(t, 1), via(t, 2));
+            case "contains": return contains(longArg(t, 1), via(t, 2));
+            case "range":    return range(longArg(t, 1), longArg(t, 2), intArg(t, 3, 1, RANGE_CAP_MAX), via(t, 4));
+            case "count":    return count(longArg(t, 1), longArg(t, 2), via(t, 3));
             case "query":    return query(t);
+            case "order":    return order(t);
+            case "depth":    return depth(longArg(t, 1));
+            case "overlap":  return span(false, intArg(t, 1, 0, 99_999), intArg(t, 2, 0, 99_999), intArg(t, 3, 1, RANGE_CAP_MAX));
+            case "stab":     return span(true, intArg(t, 1, 0, 99_999), intArg(t, 1, 0, 99_999), intArg(t, 2, 1, RANGE_CAP_MAX));
+            case "groups":   return groups(intArg(t, 1, 1, 1000));
+            case "cacheget": return cacheget(longArg(t, 1));
+            case "fleet":    return fleet();
+            case "replicaget": return replicaget(longArg(t, 1));
+            case "rebootstrap": return rebootstrap();
+            case "generations": return generations();
+            case "asof":     return asof(longArg(t, 1), longArg(t, 2));
+            case "retain":   return retain(intArg(t, 1, 0, 1_000_000));
+            case "verify":   return verify(longArg(t, 1));
+            case "names":    return names(longArg(t, 1));
+            case "compact":  return compact();
+            case "segments": return segments();
+            case "recover":  return recover();
+            case "history":  return history();
+            case "restart":  return restart(t);
             case "report":   return ok("report", str(o.report()));
             case "tick":     return ok("vitals", vitals(o.rub().tick()));
             case "pulse":    return pulse();
@@ -170,6 +239,15 @@ public final class HarnessConsole {
                 .append(",\"journalReplays\":").append(tw.journalReplays()).append('}');
         b.append(",\"rub\":").append(vitals(o.vitals()));
         b.append(",\"replica\":").append(vitals(o.replicaVitals()));
+        Brine.Stats bs = o.brine().stats();
+        b.append(",\"brine\":{\"gets\":").append(bs.gets()).append(",\"valueHits\":").append(bs.valueHits())
+                .append(",\"storeReads\":").append(bs.storeReads())
+                .append(",\"invalidations\":").append(bs.invalidations())
+                .append(",\"residentValues\":").append(bs.residentValues())
+                .append(",\"champion\":").append(str(String.valueOf(bs.champion()))).append('}');
+        b.append(",\"segments\":").append(o.primary().segmentStats().size());
+        b.append(",\"chaos\":").append(str(chaos)).append(",\"restarts\":").append(restarts);
+        b.append(",\"replicaObserverDetached\":").append(replicaObserverDetached);
         return b.append('}').toString();
     }
 
@@ -194,31 +272,27 @@ public final class HarnessConsole {
         long k = longArg(t, 1);
         String v = Organism.value(intArg(t, 2, 0, 999), intArg(t, 3, 0, 99_999),
                 intArg(t, 4, 0, 99_999));
-        String via = t.length > 5 ? t[5] : "direct";
+        String via = via(t, 5);
         if ("wire".equals(via)) {
             try (SmokeSignalClient<Long, String> w = o.wire()) {
                 w.put(k, v);
             }
-        } else if ("direct".equals(via)) {
-            o.store().put(k, v);
         } else {
-            throw new IllegalArgumentException("via must be direct or wire, not " + via);
+            o.store().put(k, v);
         }
         return "{\"ok\":true,\"key\":" + k + ",\"via\":\"" + via + "\"}";
     }
 
     String delete(String[] t) throws IOException {
         long k = longArg(t, 1);
-        String via = t.length > 2 ? t[2] : "direct";
+        String via = via(t, 2);
         boolean existed;
         if ("wire".equals(via)) {
             try (SmokeSignalClient<Long, String> w = o.wire()) {
                 existed = w.delete(k);
             }
-        } else if ("direct".equals(via)) {
-            existed = o.store().delete(k);
         } else {
-            throw new IllegalArgumentException("via must be direct or wire, not " + via);
+            existed = o.store().delete(k);
         }
         return "{\"ok\":true,\"key\":" + k + ",\"existed\":" + existed + ",\"via\":\"" + via + "\"}";
     }
@@ -255,36 +329,96 @@ public final class HarnessConsole {
                 + o.twine().stats().batchesCommitted() + "}";
     }
 
-    String get(long k) throws IOException {
-        String v = o.store().get(k);
+    String get(long k, String via) throws IOException {
+        String v = "wire".equals(via) ? wire(w -> w.get(k)) : o.store().get(k);
         return "{\"ok\":true,\"key\":" + k + ",\"found\":" + (v != null)
-                + (v == null ? "" : ",\"value\":" + val(v)) + "}";
+                + (v == null ? "" : ",\"value\":" + val(v)) + ",\"via\":\"" + via + "\"}";
     }
 
-    String contains(long k) throws IOException {
-        return "{\"ok\":true,\"key\":" + k + ",\"found\":" + (o.store().get(k) != null) + "}";
+    String contains(long k, String via) throws IOException {
+        String v = "wire".equals(via) ? wire(w -> w.get(k)) : o.store().get(k);
+        return "{\"ok\":true,\"key\":" + k + ",\"found\":" + (v != null) + ",\"via\":\"" + via + "\"}";
     }
 
-    String range(long lo, long hi, int cap) throws IOException {
+    String range(long lo, long hi, int cap, String via) throws IOException {
         if (lo > hi) {
             throw new IllegalArgumentException("range lo " + lo + " > hi " + hi);
         }
         List<String> recs = new ArrayList<>();
         int[] seen = {0};
-        o.primary().range(lo, hi, (k, v) -> {
-            if (seen[0]++ < cap) {
-                recs.add(rec(k, v));
+        if ("wire".equals(via)) {
+            // The wire materializes the whole range (OP_RANGE, 2026-08-20); the cap is applied
+            // here, after the fact, and the count is the wire's own.
+            Map<Long, String> got = wire(w -> w.rangeQuery(lo, hi));
+            for (Map.Entry<Long, String> e : got.entrySet()) {
+                if (seen[0]++ < cap) {
+                    recs.add(rec(e.getKey(), e.getValue()));
+                }
             }
-        });
+        } else {
+            o.primary().range(lo, hi, (k, v) -> {
+                if (seen[0]++ < cap) {
+                    recs.add(rec(k, v));
+                }
+            });
+        }
         return "{\"ok\":true,\"records\":[" + String.join(",", recs) + "],\"count\":" + seen[0]
-                + ",\"truncated\":" + (seen[0] > cap) + "}";
+                + ",\"truncated\":" + (seen[0] > cap) + ",\"via\":\"" + via + "\"}";
     }
 
-    String count(long lo, long hi) {
+    String count(long lo, long hi, String via) throws IOException {
         if (lo > hi) {
             throw new IllegalArgumentException("count lo " + lo + " > hi " + hi);
         }
-        return "{\"ok\":true,\"count\":" + o.primary().countRange(lo, hi) + "}";
+        int n = "wire".equals(via) ? wire(w -> w.countRange(lo, hi)) : o.primary().countRange(lo, hi);
+        return "{\"ok\":true,\"count\":" + n + ",\"via\":\"" + via + "\"}";
+    }
+
+    /**
+     * Order statistics — CSRBT's reason to exist, surfaced through the store and, by the same
+     * names, over the wire. {@code rank K} / {@code nth R} / {@code median} / {@code percentile P}
+     * / {@code first} / {@code last} / {@code size}. Empty-store answers are {@code null}, not 0.
+     */
+    String order(String[] t) throws IOException {
+        if (t.length < 2) {
+            throw new IllegalArgumentException("order needs a kind");
+        }
+        String kind = t[1];
+        int argAt = ("rank".equals(kind) || "nth".equals(kind) || "percentile".equals(kind)) ? 2 : -1;
+        String via = via(t, argAt < 0 ? 2 : 3);
+        boolean w = "wire".equals(via);
+        SmokeHouse<Long, String> p = o.primary();
+        Object answer;
+        switch (kind) {
+            case "rank": {
+                long k = longArg(t, 2);
+                answer = w ? wire(c -> c.rankOf(k)) : p.rankOf(k);
+                break;
+            }
+            case "nth": {
+                int r = intArg(t, 2, 1, Integer.MAX_VALUE);          // ranks are 1-based, like the store's
+                answer = w ? wire(c -> c.nthKey(r)) : p.nthKey(r);
+                break;
+            }
+            case "median":     answer = w ? wire(SmokeSignalClient::medianKey) : p.medianKey(); break;
+            case "percentile": {
+                int pct = intArg(t, 2, 0, 100);
+                answer = w ? wire(c -> c.percentileKey(pct)) : p.percentileKey(pct);
+                break;
+            }
+            case "first":      answer = w ? wire(SmokeSignalClient::firstKey) : p.firstKey(); break;
+            case "last":       answer = w ? wire(SmokeSignalClient::lastKey) : p.lastKey(); break;
+            case "size":       answer = w ? wire(SmokeSignalClient::size) : p.size(); break;
+            default:
+                throw new IllegalArgumentException("order kind must be rank|nth|median|percentile|first|last|size, not " + kind);
+        }
+        return "{\"ok\":true,\"kind\":\"" + kind + "\",\"answer\":" + answer + ",\"via\":\"" + via + "\"}";
+    }
+
+    /** The measuring read: nodes touched for a live key, {@code ~depth} (negative) for an absent one. */
+    String depth(long k) {
+        int d = o.primary().searchDepth(k);
+        return "{\"ok\":true,\"key\":" + k + ",\"depth\":" + d + ",\"live\":" + (d >= 1) + "}";
     }
 
     String query(String[] t) throws IOException {
@@ -302,6 +436,222 @@ public final class HarnessConsole {
         }
         return "{\"ok\":true,\"plan\":" + str(plan) + ",\"count\":" + keys.size()
                 + ",\"keys\":[" + String.join(",", ks) + "],\"truncated\":" + (keys.size() > cap) + "}";
+    }
+
+    String span(boolean stab, int lo, int hi, int cap) throws IOException {
+        if (lo > hi) {
+            throw new IllegalArgumentException("overlap lo " + lo + " > hi " + hi);
+        }
+        var q = stab ? o.carver().query().stabbing(Organism.SPAN, lo)
+                     : o.carver().query().overlapping(Organism.SPAN, lo, hi);
+        String plan = q.explain().toString();
+        List<Long> keys = q.keys();
+        List<String> ks = new ArrayList<>();
+        for (int i = 0; i < Math.min(cap, keys.size()); i++) {
+            ks.add(String.valueOf(keys.get(i)));
+        }
+        return "{\"ok\":true,\"plan\":" + str(plan) + ",\"count\":" + keys.size()
+                + ",\"keys\":[" + String.join(",", ks) + "],\"truncated\":" + (keys.size() > cap) + "}";
+    }
+
+    /** Renderer's materialized fold: how many attribute groups, and the heaviest {@code k}. */
+    String groups(int topK) {
+        var g = o.byAttr();
+        List<String> tops = new ArrayList<>();
+        for (Integer attr : g.top(topK)) {
+            tops.add("{\"attr\":" + attr + ",\"total\":" + g.total(attr) + "}");
+        }
+        return "{\"ok\":true,\"groups\":" + g.groups() + ",\"top\":[" + String.join(",", tops)
+                + "],\"appliedSequence\":" + g.appliedSequence() + ",\"gapped\":" + g.gapped() + "}";
+    }
+
+    /** Brine's answer, and whether it came from the cache or the store. */
+    String cacheget(long k) throws IOException {
+        Brine.Stats before = o.brine().stats();
+        String v = o.brine().get(k);
+        Brine.Stats after = o.brine().stats();
+        return "{\"ok\":true,\"key\":" + k + ",\"found\":" + (v != null)
+                + (v == null ? "" : ",\"value\":" + val(v))
+                + ",\"hit\":" + (after.valueHits() > before.valueHits())
+                + ",\"storeRead\":" + (after.storeReads() > before.storeReads())
+                + ",\"champion\":" + str(String.valueOf(after.champion())) + "}";
+    }
+
+    /** PitBoss's tick: the fleet report, one status per replica. */
+    String fleet() throws IOException {
+        PitBoss.FleetReport r = o.pitBoss().tick();
+        List<String> rs = new ArrayList<>();
+        for (PitBoss.ReplicaStatus st : r.replicas()) {
+            rs.add("{\"name\":" + str(st.name()) + ",\"lag\":" + st.lag() + ",\"gapped\":" + st.gapped()
+                    + ",\"rebootstrapped\":" + st.rebootstrapped() + "}");
+        }
+        return "{\"ok\":true,\"primarySequence\":" + r.primarySequence() + ",\"replicas\":["
+                + String.join(",", rs) + "]}";
+    }
+
+    String replicaget(long k) throws IOException {
+        String v = o.pitBoss().replica(REPLICA).store().get(k);
+        return "{\"ok\":true,\"key\":" + k + ",\"found\":" + (v != null)
+                + (v == null ? "" : ",\"value\":" + val(v)) + ",\"replica\":" + str(REPLICA) + "}";
+    }
+
+    /**
+     * Cold-start the replica mid-life. Honest bound, from Organism's own javadoc: the replica
+     * observer (the {@code replica} vitals in every snapshot) stays attached to the store it was
+     * born on, so from here until the next restart the snapshot says {@code replicaObserverDetached}.
+     */
+    String rebootstrap() throws IOException {
+        o.pitBoss().rebootstrap(REPLICA);
+        replicaObserverDetached = true;
+        return "{\"ok\":true,\"replica\":" + str(REPLICA) + ",\"replicaObserverDetached\":true}";
+    }
+
+    String generations() throws IOException {
+        List<String> gs = new ArrayList<>();
+        for (Long g : o.vault().generations()) {
+            gs.add(String.valueOf(g));
+        }
+        return "{\"ok\":true,\"generations\":[" + String.join(",", gs) + "]}";
+    }
+
+    /** One key as of a preserved generation — a scratch copy is recovered and released. */
+    String asof(long gen, long k) throws IOException {
+        if (!o.vault().generations().contains(gen)) {
+            return refuse("not_found", "no generation " + gen + " in the vault");
+        }
+        try (DryAge.AgedView<Long, String> past = o.vault().asOf(gen)) {
+            String v = past.store().get(k);
+            return "{\"ok\":true,\"generation\":" + gen + ",\"key\":" + k + ",\"found\":" + (v != null)
+                    + (v == null ? "" : ",\"value\":" + val(v)) + ",\"size\":" + past.store().size() + "}";
+        }
+    }
+
+    String retain(int n) throws IOException {
+        List<String> rel = new ArrayList<>();
+        for (Long g : o.vault().retainNewest(n)) {
+            rel.add(String.valueOf(g));
+        }
+        return "{\"ok\":true,\"released\":[" + String.join(",", rel) + "],\"generations\":"
+                + o.vault().generations().size() + "}";
+    }
+
+    String verify(long gen) {
+        Path a = archive.resolve("gen-" + gen + ".jerky");
+        if (!Files.exists(a)) {
+            return refuse("not_found", "no archive for generation " + gen);
+        }
+        return "{\"ok\":true,\"generation\":" + gen + ",\"verified\":" + Jerky.verify(a) + "}";
+    }
+
+    String names(long gen) throws IOException {
+        Path a = archive.resolve("gen-" + gen + ".jerky");
+        if (!Files.exists(a)) {
+            return refuse("not_found", "no archive for generation " + gen);
+        }
+        List<String> ns = new ArrayList<>();
+        for (String n : Jerky.names(a)) {
+            ns.add(str(n));
+        }
+        return "{\"ok\":true,\"generation\":" + gen + ",\"names\":[" + String.join(",", ns) + "]}";
+    }
+
+    String compact() throws IOException {
+        long before = o.primary().garbageBytes();
+        long reclaimed = o.primary().compact();
+        return "{\"ok\":true,\"reclaimed\":" + reclaimed + ",\"garbageBefore\":" + before
+                + ",\"garbageAfter\":" + o.primary().garbageBytes() + ",\"segments\":"
+                + o.primary().segmentStats().size() + "}";
+    }
+
+    String segments() throws IOException {
+        List<String> ss = new ArrayList<>();
+        for (SmokeHouse.SegmentStat st : o.primary().segmentStats()) {
+            ss.add("{\"id\":" + st.segmentId() + ",\"bytes\":" + st.bytes() + ",\"garbageBytes\":"
+                    + st.garbageBytes() + ",\"active\":" + st.active() + "}");
+        }
+        return "{\"ok\":true,\"segments\":[" + String.join(",", ss) + "]}";
+    }
+
+    /** Replay Twine's journal now: true if a batch was waiting, false if the journal was clean. */
+    String recover() throws IOException {
+        boolean replayed = o.twine().recover();
+        return "{\"ok\":true,\"replayed\":" + replayed + ",\"journalReplays\":"
+                + o.twine().stats().journalReplays() + "}";
+    }
+
+    String history() {
+        List<String> hs = new ArrayList<>();
+        for (Vitals v : o.rub().history()) {
+            hs.add(vitals(v));
+        }
+        return "{\"ok\":true,\"history\":[" + String.join(",", hs) + "]}";
+    }
+
+    /**
+     * Close the organism and reopen it at the same root — the crash-recovery road (Twine's
+     * journal replays into every index on construction) — optionally under a Sizzle plan.
+     * Chaos is a constructor seam on the organism, so this is the only honest way to arm it.
+     */
+    String restart(String[] t) throws IOException {
+        if (organismRoot == null) {
+            throw new IllegalArgumentException("restart needs a console started with a root");
+        }
+        String planName = t.length > 1 ? t[1] : "none";
+        long latency = t.length > 2 ? longArg(t, 2) : 0;
+        if (latency < 0 || latency > 5_000) {
+            throw new IllegalArgumentException("latency must be 0..5000 ms");
+        }
+        ChaosPlan plan = plan(planName);
+        if (latency > 0) {
+            plan = plan.withLatencyMillis(latency);
+        }
+        o.close();
+        o = new Organism(organismRoot, seed, plan);
+        chaos = planName + (latency > 0 ? "+" + latency + "ms" : "");
+        restarts++;
+        replicaObserverDetached = false;
+        return "{\"ok\":true,\"restarts\":" + restarts + ",\"chaos\":" + str(chaos)
+                + ",\"wirePort\":" + o.wirePort() + ",\"size\":" + o.primary().size()
+                + ",\"journalReplays\":" + o.twine().stats().journalReplays() + "}";
+    }
+
+    static ChaosPlan plan(String spec) {
+        String[] p = spec.split(":");
+        switch (p[0]) {
+            case "none":  return ChaosPlan.none();
+            case "once":  return ChaosPlan.crashOnceAtOp(Long.parseLong(part(p, 1)));
+            case "every": return ChaosPlan.crashEveryNthOp(Long.parseLong(part(p, 1)));
+            case "prob":  return ChaosPlan.crashWithProbability(Long.parseLong(part(p, 1)),
+                                  Double.parseDouble(part(p, 2)));
+            default:
+                throw new IllegalArgumentException("plan must be none | once:N | every:N | prob:SEED:P, not " + spec);
+        }
+    }
+
+    private static String part(String[] p, int i) {
+        if (i >= p.length) {
+            throw new IllegalArgumentException("plan " + p[0] + " needs " + i + " argument(s)");
+        }
+        return p[i];
+    }
+
+    interface WireCall<R> {
+        R call(SmokeSignalClient<Long, String> w) throws IOException;
+    }
+
+    /** One fresh loopback client per call — the same route the write side takes. */
+    <R> R wire(WireCall<R> call) throws IOException {
+        try (SmokeSignalClient<Long, String> w = o.wire()) {
+            return call.call(w);
+        }
+    }
+
+    static String via(String[] t, int i) {
+        String via = i < t.length ? t[i] : "direct";
+        if (!"direct".equals(via) && !"wire".equals(via)) {
+            throw new IllegalArgumentException("via must be direct or wire, not " + via);
+        }
+        return via;
     }
 
     String pulse() {
