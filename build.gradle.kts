@@ -42,6 +42,27 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
 }
 
+// ADR-112 (2026-09-01): the organism as a harness target. The CSRBT automation contract's
+// csrbt-organism plugin (CSRBT/tools/harness_plugin_organism.py) drives HarnessConsole over
+// stdin/stdout and needs a classpath to launch it with. This task writes the runtime classpath
+// -- main classes plus every engine and library jar the composite resolves -- to one file the
+// plugin reads, so the plugin never re-derives Gradle's resolution. Absent file == not built,
+// and the plugin says so rather than guessing at jar locations.
+val harnessClasspath by tasks.registering {
+    description = "Write the organism's runtime classpath for the CSRBT harness plugin."
+    group = "verification"
+    dependsOn(tasks.named("classes"))
+    val cp = sourceSets.main.get().runtimeClasspath
+    val outFile = layout.buildDirectory.file("harness/classpath.txt")
+    inputs.files(cp)
+    outputs.file(outFile)
+    doLast {
+        val f = outFile.get().asFile
+        f.parentFile.mkdirs()
+        f.writeText(cp.files.joinToString(File.pathSeparator) { it.absolutePath })
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
     systemProperty("log4j2.loggerContextFactory",

@@ -4,6 +4,13 @@ Engine 12: the integration organism. `Organism` wires all eleven engines over on
 `OrganismTest` is the composed oracle (four-subscriber tail test is the headline);
 `Exhibit` is the one-command demo (`./gradlew run`).
 
+`HarnessConsole` (ADR-112, 2026-09-01) is the organism as a target of the CSRBT automation
+harness: stdin/stdout line protocol, numbers only, no token or policy here — those live in
+`CSRBT/tools/harness_contract.py`. `./gradlew harnessClasspath` writes the classpath the
+Python plugin (`CSRBT/tools/harness_plugin_organism.py`) launches it with. Adding a verb: add
+it to the console, declare its risk in the plugin's descriptor, and give `verify_organism`
+a check that would fail without it — `CSRBT/tools/mutate_organism.py` is how that is proven.
+
 ## Build & test
 - Nested composite including EVERY sibling repo — all must be cloned side by side.
   Gradle deduplicates the shared transitive includes.
