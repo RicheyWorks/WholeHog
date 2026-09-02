@@ -74,6 +74,7 @@ public final class Organism implements Closeable {
     private final PitBoss<Long, String> pitBoss;
     private final DryAge<Long, String> vault;
     private final Sizzle<Long, String> writeChaos;
+    private final long replicaLagMillis;
     private final Twine<Long, String> twine;
     private final SmokeSignalServer<Long, String> wireServer;
     private final Rub<Long, String> rub;
@@ -115,7 +116,22 @@ public final class Organism implements Closeable {
      * journal + idempotent replay, re-driving every index) is what has to bring it back.
      */
     public Organism(Path root, long seed, ChaosPlan writeChaos) throws IOException {
+        this(root, seed, writeChaos, 0);
+    }
+
+    /**
+     * As {@link #Organism(Path, long, ChaosPlan)}, with the replication feed held back by
+     * {@code replicaLagMillis} per event — {@link Sizzle#slow} on PitBoss's feed seam, the
+     * honest way to put the replica behind the primary (2026-09-02; ADR-113 had held this as
+     * "not cut for a harness"). With 0 the seam is transparent. Frames still arrive in order and
+     * none are dropped: the replica is late, never wrong.
+     */
+    public Organism(Path root, long seed, ChaosPlan writeChaos, long replicaLagMillis) throws IOException {
         Objects.requireNonNull(writeChaos, "writeChaos");
+        if (replicaLagMillis < 0) {
+            throw new IllegalArgumentException("replicaLagMillis must be >= 0: " + replicaLagMillis);
+        }
+        this.replicaLagMillis = replicaLagMillis;
         Files.createDirectories(root);
         // Eleventh-pass W-1: the organism opens a dozen live resources — a store with its tail
         // thread, two tail-subscribing views/caches, a replication server and a replica, a
@@ -138,7 +154,8 @@ public final class Organism implements Closeable {
         this.byAttr = renderer.countBy("byAttr", Organism::attrOf,
                 Comparator.<Integer>naturalOrder());
         this.brine = Brine.over(primary, 64, 512, seed);
-        this.pitBoss = PitBoss.over(primary, options(), true);
+        this.pitBoss = PitBoss.over(primary, options(), true,
+                replicaLagMillis > 0 ? l -> Sizzle.slow(l, replicaLagMillis) : l -> l);
         this.pitBoss.addReplica("exhibit", root.resolve("replica"));
         this.vault = DryAge.vault(root.resolve("vault"), options());
         // Writes route through the indexes (never the primary), now via a Sizzle chaos seam so
@@ -323,6 +340,11 @@ public final class Organism implements Closeable {
     }
 
     /** Faults the write-path chaos seam has injected — zero under the default {@code none()} plan. */
+    /** Milliseconds every replicated event is held back by (0: the feed seam is transparent). */
+    public long replicaLagMillis() {
+        return replicaLagMillis;
+    }
+
     public long chaosCrashes() {
         return writeChaos.crashesInjected();
     }

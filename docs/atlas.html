@@ -1,0 +1,344 @@
+<title>Whole Hog Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root {
+    --ground: #F5F3EF;
+    --panel: #FDFCFA;
+    --ink: #26231F;
+    --muted: #6E675E;
+    --line: #DDD8D0;
+    --ember: #C4501B;
+    --ember-soft: #F3E2D6;
+    --seam: #5E7C8A;
+    --good: #3E7A45;
+    --bad: #A83232;
+    --held: #8A6D3B;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #191613;
+      --panel: #211D18;
+      --ink: #EAE4DA;
+      --muted: #9A9186;
+      --line: #3A342C;
+      --ember: #E0672E;
+      --ember-soft: #33241A;
+      --seam: #7FA0AF;
+      --good: #6FAE76;
+      --bad: #C96A6A;
+      --held: #C2A163;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #191613;
+    --panel: #211D18;
+    --ink: #EAE4DA;
+    --muted: #9A9186;
+    --line: #3A342C;
+    --ember: #E0672E;
+    --ember-soft: #33241A;
+    --seam: #7FA0AF;
+    --good: #6FAE76;
+    --bad: #C96A6A;
+    --held: #C2A163;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1, h2, h3 { font-family: "Bricolage Grotesque", "Arial Black", sans-serif; text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.4rem, 6vw, 4rem); font-weight: 800; line-height: 1.02; letter-spacing: -0.015em; }
+  h2 { font-size: 1.5rem; font-weight: 800; margin: 0 0 4px; }
+  h3 { font-size: 1.02rem; font-weight: 600; }
+  .mono, td.num, .meter, .adr { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ember); font-weight: 600;
+  }
+  header.hero { margin-bottom: 20px; }
+  .hero p.lede {
+    font-size: 1.08rem; max-width: 62ch; color: var(--muted); margin: 14px 0 0;
+  }
+  .hero .lede strong { color: var(--ink); font-weight: 600; }
+  section { margin-top: 56px; }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 2px solid var(--ink); padding-bottom: 8px; margin-bottom: 18px; }
+  .sec-head .count { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 0.85rem; }
+
+  figure.map { margin: 28px 0 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 18px 14px 8px; overflow-x: auto; }
+  figure.map svg { display: block; max-width: 100%; height: auto; min-width: 640px; margin: 0 auto; }
+  figcaption { font-size: 0.85rem; color: var(--muted); padding: 8px 6px 6px; max-width: 78ch; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  .tablewrap { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+  th { font-family: "IBM Plex Mono", monospace; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .eng { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; white-space: nowrap; }
+  .eng a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
+  .eng a:hover, .eng a:focus-visible { border-bottom-color: var(--ember); outline: none; }
+  .no { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 0.78rem; padding-right: 2px; }
+  .role { color: var(--muted); font-size: 0.88rem; }
+  .pill { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; padding: 1px 7px; border-radius: 2px; border: 1px solid var(--line); white-space: nowrap; }
+  .pill.v { color: var(--seam); border-color: var(--seam); }
+  .pill.green { color: var(--good); border-color: var(--good); }
+  .pill.na { color: var(--muted); }
+
+  .ledger { display: grid; gap: 10px; }
+  .finding { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--seam); border-radius: 3px; padding: 12px 16px; }
+  .finding.resolved { border-left-color: var(--good); }
+  .finding .fhead { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+  .finding .fno { font-family: "IBM Plex Mono", monospace; font-size: 0.75rem; color: var(--muted); }
+  .finding p { margin: 6px 0 0; font-size: 0.92rem; color: var(--muted); max-width: 88ch; }
+  .finding p b { color: var(--ink); font-weight: 600; }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--ember); border-radius: 3px; padding: 16px 18px 14px; }
+  .stat .big { font-family: "Bricolage Grotesque", sans-serif; font-weight: 800; font-size: 2.2rem; line-height: 1; color: var(--ember); font-variant-numeric: tabular-nums; }
+  .stat .what { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 8px; }
+  .stat p { margin: 8px 0 0; font-size: 0.88rem; color: var(--muted); }
+
+  .meterbox { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 16px 18px; overflow-x: auto; }
+  .meter { font-size: 0.82rem; white-space: pre; line-height: 1.75; color: var(--ink); }
+  .meter .k { color: var(--seam); }
+  .meter .dim { color: var(--muted); }
+
+  ol.passes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  ol.passes li { display: grid; grid-template-columns: 108px 1fr; gap: 16px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+  ol.passes li:last-child { border-bottom: none; }
+  .pdate { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: var(--muted); padding-top: 2px; white-space: nowrap; }
+  .pwhat b { font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; }
+  .pwhat { font-size: 0.94rem; }
+  .pwhat .adr { font-size: 0.78rem; color: var(--seam); }
+  .pwhat p { margin: 3px 0 0; color: var(--muted); font-size: 0.88rem; max-width: 84ch; }
+
+  .held { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .helditem { border: 1px dashed var(--held); border-radius: 3px; padding: 14px 16px; }
+  .helditem .hh { font-family: "IBM Plex Mono", monospace; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--held); }
+  .helditem h3 { margin: 6px 0 4px; }
+  .helditem p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+
+  footer { margin-top: 64px; border-top: 2px solid var(--ink); padding-top: 14px; font-size: 0.84rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 24px; }
+  footer .mono { font-size: 0.78rem; }
+  a { color: var(--seam); }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="eyebrow">RicheyWorks · fourteen engines · one log</div>
+    <h1>Whole Hog Atlas</h1>
+    <p class="lede">The map of the smokehouse organism: an adaptive ordered index (<strong>CSRBT</strong>) and the thirteen engines composed around it — every write routed, every subscriber fed off one tail, every contract proven in a composed oracle. <strong>The log is the only truth;</strong> everything else is a cache of it, and every claim below has a test or a number behind it.</p>
+  </header>
+
+  <figure class="map">
+    <svg viewBox="0 0 940 560" role="img" aria-label="The organism's mechanism: writes enter through Twine and the wire, route through the Sizzle chaos seam into the indexed store; the store's tail fans out to Renderer, Brine, the PitBoss replica, and Rub; history flows down through DryAge's vault into Jerky archives carrying a scan.run sidecar.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="arrE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#C4501B"/>
+        </marker>
+      </defs>
+      <g fill="none" stroke="currentColor" stroke-width="1.2" font-family="'IBM Plex Mono', monospace">
+
+        <!-- WholeHog boundary -->
+        <rect x="12" y="14" width="916" height="470" rx="4" stroke-dasharray="5 4" opacity="0.55"/>
+        <text x="26" y="36" fill="currentColor" stroke="none" font-size="12" opacity="0.75">WholeHog — engine 12: the integration organism, one composed oracle</text>
+
+        <!-- writers column -->
+        <rect x="36" y="96" width="128" height="44"/>
+        <text x="100" y="114" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="600">SmokeSignal</text>
+        <text x="100" y="130" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">10 · the wire</text>
+
+        <rect x="36" y="196" width="128" height="44"/>
+        <text x="100" y="214" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="600">Twine</text>
+        <text x="100" y="230" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">9 · atomic batches</text>
+
+        <!-- chaos seam -->
+        <rect x="232" y="146" width="96" height="44" stroke="#C4501B"/>
+        <text x="280" y="164" text-anchor="middle" fill="#C4501B" stroke="none" font-size="13" font-weight="600">Sizzle</text>
+        <text x="280" y="180" text-anchor="middle" fill="#C4501B" stroke="none" font-size="10.5">14 · chaos seam</text>
+
+        <!-- writes -->
+        <path d="M164 118 L200 118 L200 158 L232 158" marker-end="url(#arr)"/>
+        <text x="168" y="110" fill="currentColor" stroke="none" font-size="10.5">put · delete · batch</text>
+        <path d="M164 218 L200 218 L200 178 L232 178" marker-end="url(#arr)"/>
+        <text x="170" y="243" fill="currentColor" stroke="none" font-size="10.5">journaled commit</text>
+        <path d="M328 168 L392 168" marker-end="url(#arrE)" stroke="#C4501B"/>
+        <text x="332" y="160" fill="#C4501B" stroke="none" font-size="10.5">index fan-out</text>
+
+        <!-- the store -->
+        <rect x="392" y="96" width="216" height="150" stroke-width="2"/>
+        <text x="500" y="120" text-anchor="middle" fill="currentColor" stroke="none" font-size="14" font-weight="600">SmokeHouse · 3</text>
+        <text x="500" y="138" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">IndexedStore: secondary + interval</text>
+        <rect x="412" y="150" width="176" height="36" stroke-dasharray="3 3"/>
+        <text x="500" y="167" text-anchor="middle" fill="currentColor" stroke="none" font-size="11">CSRBT · 1 — adaptive index</text>
+        <text x="500" y="180" text-anchor="middle" fill="currentColor" stroke="none" font-size="9.5" opacity="0.7">recovery sorted by SuperBeefSort · 2</text>
+        <text x="500" y="226" text-anchor="middle" fill="#C4501B" stroke="none" font-size="10.5" font-weight="600">the append-only log — the only truth</text>
+
+        <!-- reads -->
+        <rect x="392" y="300" width="98" height="44"/>
+        <text x="441" y="318" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="600">Carver</text>
+        <text x="441" y="334" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">4 · read planner</text>
+        <path d="M441 300 L441 246" marker-end="url(#arr)"/>
+        <text x="447" y="278" fill="currentColor" stroke="none" font-size="10.5">plans</text>
+
+        <!-- tail fan-out -->
+        <path d="M608 122 L700 122" marker-end="url(#arr)"/>
+        <path d="M608 156 L700 156" marker-end="url(#arr)"/>
+        <path d="M608 190 L700 190" marker-end="url(#arr)"/>
+        <path d="M608 224 L700 224" marker-end="url(#arr)"/>
+        <text x="614" y="112" fill="currentColor" stroke="none" font-size="10.5">tail — four subscribers, one churn</text>
+
+        <rect x="700" y="104" width="200" height="34"/>
+        <text x="712" y="125" fill="currentColor" stroke="none" font-size="12.5" font-weight="600">Renderer <tspan opacity="0.65" font-size="10.5">5 · live views</tspan></text>
+        <rect x="700" y="140" width="200" height="34"/>
+        <text x="712" y="161" fill="currentColor" stroke="none" font-size="12.5" font-weight="600">Brine <tspan opacity="0.65" font-size="10.5">6 · evolved cache</tspan></text>
+        <rect x="700" y="176" width="200" height="34"/>
+        <text x="712" y="197" fill="currentColor" stroke="none" font-size="12.5" font-weight="600">PitBoss <tspan opacity="0.65" font-size="10.5">7 · replica fleet</tspan></text>
+        <rect x="700" y="212" width="200" height="34" stroke="#C4501B"/>
+        <text x="712" y="233" fill="#C4501B" stroke="none" font-size="12.5" font-weight="600">Rub <tspan font-size="10.5">13 · vitals + pulse</tspan></text>
+
+        <!-- history -->
+        <rect x="560" y="300" width="120" height="44"/>
+        <text x="620" y="318" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="600">DryAge</text>
+        <text x="620" y="334" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">8 · the vault</text>
+        <path d="M560 246 L560 280 L596 300" marker-end="url(#arr)" transform="translate(0,0)"/>
+        <text x="500" y="286" fill="currentColor" stroke="none" font-size="10.5">preserve (+ scan.run)</text>
+
+        <rect x="760" y="300" width="140" height="44"/>
+        <text x="830" y="318" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="600">Jerky</text>
+        <text x="830" y="334" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">11 · cold archives</text>
+        <path d="M680 322 L760 322" marker-end="url(#arr)"/>
+        <text x="688" y="314" fill="currentColor" stroke="none" font-size="10.5">cure</text>
+
+        <!-- cold scan path -->
+        <path d="M830 344 L830 400 L560 400" marker-end="url(#arrE)" stroke="#C4501B"/>
+        <text x="586" y="392" fill="#C4501B" stroke="none" font-size="10.5">extract scan.run → coldScan · seed — 33× faster than resurrection</text>
+
+        <!-- seeded historical view -->
+        <rect x="392" y="378" width="168" height="44" stroke-dasharray="3 3"/>
+        <text x="476" y="396" text-anchor="middle" fill="currentColor" stroke="none" font-size="12">seeded moment</text>
+        <text x="476" y="412" text-anchor="middle" fill="currentColor" stroke="none" font-size="10.5" opacity="0.7">Carver plans over history</text>
+
+        <!-- oracle -->
+        <text x="470" y="470" text-anchor="middle" fill="currentColor" stroke="none" font-size="11" opacity="0.8">every answer above is checked against one TreeMap on one seeded stream — the composed oracle</text>
+      </g>
+    </svg>
+    <figcaption>The mechanism, not the org chart: writes enter only through the routed seams (Twine's journaled batches and the wire, through Sizzle's chaos seam into the index fan-out — never the primary); the store's tail feeds four subscribers who never meet; history is preserved with its sorted run and cured cold, where it can be scanned or re-seeded without resurrection. Ember marks the paths the measurements singled out.</figcaption>
+  </figure>
+
+  <section>
+    <div class="sec-head"><h2>The engines</h2><span class="count">14 repos · nested composite builds · github.com/RicheyWorks · <span id="suite-stamp"><!-- stamp:begin -->suites read 2026-09-02 · 1626 tests<!-- stamp:end --></span></span></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>Engine</th><th>Role</th><th>Version</th><th>Suite</th></tr></thead>
+        <tbody>
+<!-- engines:begin -->
+          <tr><td class="no">1</td><td class="eng"><a href="https://github.com/RicheyWorks/CSRBT">CSRBT</a></td><td class="role">the adaptive ordered index — Red-Black/AVL/Splay/Hybrid strategies, ensembles, evolution, ecology instruments, classroom seam; the harness's lab console (core + experimental suites)</td><td><span class="pill v">0.3.1</span></td><td class="num"><span class="pill green">1133 ✓</span></td></tr>
+          <tr><td class="no">2</td><td class="eng"><a href="https://github.com/RicheyWorks/SuperBeefSort">SuperBeefSort</a></td><td class="role">the intake tract — profiles, sorts, feeds in O(n); the recovery engine (main suite; the native kernels need JDK 22 + Rust and skip themselves elsewhere)</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">318 ✓</span></td></tr>
+          <tr><td class="no">3</td><td class="eng"><a href="https://github.com/RicheyWorks/SmokeHouse">SmokeHouse</a></td><td class="role">the log-structured store — durability, tail, watchers, replicas, sorted-run exports, configurable ring, bounded as-of recovery, the replication feed seam</td><td><span class="pill v">0.3.0</span></td><td class="num"><span class="pill green">80 ✓</span></td></tr>
+          <tr><td class="no">4</td><td class="eng"><a href="https://github.com/RicheyWorks/Carver">Carver</a></td><td class="role">the read planner — costs access paths with CSRBT order statistics as its histogram</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">9 ✓</span></td></tr>
+          <tr><td class="no">5</td><td class="eng"><a href="https://github.com/RicheyWorks/Renderer">Renderer</a></td><td class="role">the materialized-view engine — folds the tail into live ranked aggregates</td><td><span class="pill v">0.1.1</span></td><td class="num"><span class="pill green">6 ✓</span></td></tr>
+          <tr><td class="no">6</td><td class="eng"><a href="https://github.com/RicheyWorks/Brine">Brine</a></td><td class="role">the adaptive cache — eviction policy evolved by csrbt-experimental's machine</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">5 ✓</span></td></tr>
+          <tr><td class="no">7</td><td class="eng"><a href="https://github.com/RicheyWorks/PitBoss">PitBoss</a></td><td class="role">the fleet conductor — lag watched from the conductor's seat, gap re-bootstrap, the promotion runbook</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">4 ✓</span></td></tr>
+          <tr><td class="no">8</td><td class="eng"><a href="https://github.com/RicheyWorks/DryAge">DryAge</a></td><td class="role">time travel — CRC'd generations, scan-carrying preserves, retention as one call, as-of a record</td><td><span class="pill v">0.3.0</span></td><td class="num"><span class="pill green">10 ✓</span></td></tr>
+          <tr><td class="no">9</td><td class="eng"><a href="https://github.com/RicheyWorks/Twine">Twine</a></td><td class="role">crash-atomic batches — journaled commit, idempotent replay, enforced single writer, metered</td><td><span class="pill v">0.1.1</span></td><td class="num"><span class="pill green">8 ✓</span></td></tr>
+          <tr><td class="no">10</td><td class="eng"><a href="https://github.com/RicheyWorks/SmokeSignal">SmokeSignal</a></td><td class="role">the wire — loopback protocol: reads, routed writes, whole batches, ranges, its own meter; framing errors close, execution errors answer</td><td><span class="pill v">0.3.0</span></td><td class="num"><span class="pill green">14 ✓</span></td></tr>
+          <tr><td class="no">11</td><td class="eng"><a href="https://github.com/RicheyWorks/Jerky">Jerky</a></td><td class="role">cold storage — compressed CRC-verified archives, targeted extraction</td><td><span class="pill v">0.2.0</span></td><td class="num"><span class="pill green">5 ✓</span></td></tr>
+          <tr><td class="no">12</td><td class="eng"><a href="https://github.com/RicheyWorks/WholeHog">WholeHog</a></td><td class="role">the integration organism — all of them at once, one composed oracle, the findings ledger, the harness console</td><td><span class="pill v">0.2.1</span></td><td class="num"><span class="pill green">21 ✓</span></td></tr>
+          <tr><td class="no">13</td><td class="eng"><a href="https://github.com/RicheyWorks/Rub">Rub</a></td><td class="role">observability — tail meter fused with store gauge into vitals; the pulse; honest gaps</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">6 ✓</span></td></tr>
+          <tr><td class="no">14</td><td class="eng"><a href="https://github.com/RicheyWorks/Sizzle">Sizzle</a></td><td class="role">chaos — deterministic fault + latency injection at the write seam, the tail and the replication feed</td><td><span class="pill v">0.1.0</span></td><td class="num"><span class="pill green">7 ✓</span></td></tr>
+<!-- engines:end -->
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Measured, not assumed</h2><span class="count">pre-registered rules, seeded runs, medians</span></div>
+    <div class="stats">
+      <div class="stat">
+        <div class="big">524× → 33×</div>
+        <div class="what">the cold-scan trigger, fired and closed</div>
+        <p>Scanning a cold archive via restore cost 524× the raw-read floor. The scan-sidecar ADR answered it the same day: sorted runs ride in every scan-carrying generation, and <span class="mono">coldScan</span> runs 33× faster than resurrection.</p>
+      </div>
+      <div class="stat">
+        <div class="big">191%</div>
+        <div class="what">the preserve-often workaround, priced dead</div>
+        <p>Checkpointing every 2k ops costs 191% of the churn's own time (~1.4&nbsp;MB per checkpoint) against a 25% viability bar. Record-granularity as-of stays held on its consumer trigger — knowing exactly what the fallback costs.</p>
+      </div>
+      <div class="stat">
+        <div class="big">B* ≈ 128k</div>
+        <div class="what">the amortization frontier (ADR-018)</div>
+        <p>An EWS-triggered morpher raced against best-fixed across regime block lengths: 2.24× worse at 2k ops, monotone to a ~1% win at 256k — giving ADR-012's re-arming trigger #1 its number.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The findings ledger</h2><span class="count">discoveries the organism forced upstream</span></div>
+    <div class="ledger">
+      <div class="finding resolved"><div class="fhead"><span class="fno">#1</span><h3>Twine's sink seam</h3></div><p>Batches over an indexed store must fan out through the indexes — Twine gained <b>PutSink/DeleteSink</b> at design time, the seam every later routing decision reused.</p></div>
+      <div class="finding resolved"><div class="fhead"><span class="fno">#2</span><h3>The wire was read-only — resolved</h3></div><p>Deliberately unsolved until a consumer arrived. SmokeSignal gained the <b>WriteRoute</b> seam; a wire client is now a first-class writer whose puts reach every secondary, view, replica, and invalidation.</p></div>
+      <div class="finding resolved"><div class="fhead"><span class="fno">#3</span><h3>The watcher wanted to be an organ</h3></div><p>The bare tail counter that proved four-subscriber convergence generalized into <b>Rub</b>, engine 13 — a meter fused with a gauge, gaps reported rather than hidden.</p></div>
+      <div class="finding resolved"><div class="fhead"><span class="fno">#4</span><h3>The write path wanted to be fault-injectable</h3></div><p>Finding #1 earned its keep: <b>Sizzle</b>, engine 14, wraps the sink seam, and composed crash-atomicity is demonstrated at every crash point rather than asserted in a comment.</p></div>
+      <div class="finding resolved"><div class="fhead"><span class="fno">#5</span><h3>Curing history needed no scratch copy</h3></div><p>Two copies and a recovery pass, to read immutable CRC'd bytes — pure ceremony. DryAge named <b>generationPath</b> for read-only archival consumers, and the dance is gone.</p></div>
+      <div class="finding resolved"><div class="fhead"><span class="fno">#6</span><h3>Batches wanted to cross the wire whole</h3></div><p>SmokeSignal gained <b>OP_BATCH + BatchRoute</b> — the server reads the whole batch before touching the route, the organism ties the route to Twine, and any wire client gets crash-atomic multi-key batches without knowing Twine exists.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The organism's physical</h2><span class="count">./gradlew run — one call, every meter</span></div>
+    <div class="meterbox"><div class="meter"><span class="k">rub</span>        keys=263 seq=2396 segs=22 live=9994B garbage=75750B (88.3%) puts=2084 dels=312 (13.0% del) <span class="dim">gaps=0</span>
+<span class="k">pulse</span>      ops=+2396 puts=2084 dels=312 gaps=0 keys=+263 garbage=+75750B
+<span class="k">replica</span>    keys=263 seq=2396 segs=23 live=9994B garbage=75750B (88.3%) puts=2084 dels=312 (13.0% del) <span class="dim">gaps=0</span>
+<span class="k">wire</span>       conns=1 reqs=4 (get=0 put=1 del=0 size=1 range=1 batch=1) errors=0
+<span class="k">twine</span>      batches=197 ops=591 replays=0
+<span class="k">brine</span>      Stats[invalidations=2396, champion=SLRU(2/10,p1)]</div></div>
+    <figcaption>A real physical from the exhibit: the replica's meter converges to the primary's exactly — count for count — which is fleet convergence proven at the observability layer. A physical never changes the patient: two consecutive reads are identical on a quiet organism.</figcaption>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The passes</h2><span class="count">every feature burst is followed by a hunt</span></div>
+    <ol class="passes">
+      <li><span class="pdate">2026-08-12</span><div class="pwhat"><b>The hardening day</b> <span class="adr">ADR-021 · ADR-022</span><p>Five adversarial passes, 26 probe-verified fixes, tournaments re-scored under honest methodology.</p></div></li>
+      <li><span class="pdate">2026-08-16</span><div class="pwhat"><b>Sixth pass</b><p>37 candidates, 34 confirmed and fixed — including the S1 tier: a restored checkpoint crashing the next write, NIL-sentinel corruption that could empty the tree, truncated snapshots accepted on load.</p></div></li>
+      <li><span class="pdate">2026-08-17</span><div class="pwhat"><b>Seventh pass</b> <span class="adr">ADR-023 … ADR-026 · v0.2.1</span><p>Four held items settled by measurement; 81 edge-case tests; constructor-to-constructor wiring audit returned clean.</p></div></li>
+      <li><span class="pdate">2026-08-18</span><div class="pwhat"><b>Eighth pass</b> <span class="adr">ADR-027 · ADR-028</span><p>The .eco reverse path closed; height maintained once per write; delete signaling and opt-in fsync.</p></div></li>
+      <li><span class="pdate">2026-08-19</span><div class="pwhat"><b>Engines 13–14 + the correction</b> <span class="adr">ADR-029 · ADR-030</span><p>Rub and Sizzle born and composed; the stale-clone incident fully unwound — voids on the record, regressions restored, 1100 tests green.</p></div></li>
+      <li><span class="pdate">2026-08-20</span><div class="pwhat"><b>The measurement day → the sidecar</b><p>Both cold triggers priced; the fired one closed the same day by the scan-sidecar ADR. Wire ranges, wire stats, seeds, the pulse, retention, the ring knob, the proven gap, Twine's meter.</p></div></li>
+      <li><span class="pdate">2026-08-20</span><div class="pwhat"><b>Ninth pass + frontend verification</b><p>Three findings fixed (the vault's staging leak, Twine's unenforced single-writer, Jerky's double read); all four HTML pages driven clean in headless Chromium; canonical artifacts regenerated byte-reproducibly.</p></div></li>
+      <li><span class="pdate">2026-08-20</span><div class="pwhat"><b>The bound, priced</b><p>The last unpriced held item: the in-memory apparatus costs 181&nbsp;B per live key (marginal, GC-fenced). Nothing in the organism is held on intuition anymore.</p></div></li>
+      <li><span class="pdate">2026-08-20</span><div class="pwhat"><b>Tenth pass — the ecosystem-wide hunt</b><p>Two territories hunted before the session limit; 26 real candidates recorded rather than 100 padded ones, and all 26 closed: the vault's scratch leaks, Twine's commit flag moved after the atomic move, the wire's oversized refusal, CSRBT's degenerate-snapshot overflow — and the wire-framing ADR that separates a framing error (close the session) from an execution error (answer and keep serving).</p></div></li>
+      <li><span class="pdate">2026-08-21</span><div class="pwhat"><b>Eleventh and twelfth passes → the hardening release</b><p>SmokeHouse core, twice: a range surviving a compaction commit, a replica refusing a non-contiguous frame (a hole is a gap), the organism unwinding a partial build. Seven engines patched in one coordinated release, every fix probe-verified.</p></div></li>
+      <li><span class="pdate">2026-08-22</span><div class="pwhat"><b>Record-granularity as-of, cut</b><p>The held seam met its consumer: a moment no <span class="mono">preserve</span> ever captured. <span class="mono">SmokeHouse.openAsOfRecord</span> replays exactly the first N records and stops across segment boundaries; DryAge reads a generation as of a record count. The vault's oldest held item, closed with its demonstrating test.</p></div></li>
+      <li><span class="pdate">2026-09-01 → 02</span><div class="pwhat"><b>The automation harness reaches the organism</b> <span class="adr">ADR-112 … ADR-120</span><p>Every organ is operable through one gateway from its manifest alone — <span class="mono">HarnessConsole</span> in WholeHog, three plugins (page, organism, lab), two transports (stdio and MCP), one robot that walks every target from the schema and is itself mutation-tested against a fixture built to be walked. The engines' own suites are read into a ratcheted ledger (<span class="mono">tools/ecosystem.py</span>), and this table is regenerated from it. The robot's finds went upstream: a StackOverflow in CSRBT's health check, a fleet reporting lag 0 for a replica twenty frames behind.</p></div></li>
+    </ol>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Held, on purpose</h2><span class="count">seams that wait for their triggers</span></div>
+    <div class="held">
+      <div class="helditem"><div class="hh">closed · 2026-08-22</div><h3>Record-granularity as-of</h3><p>Was held on its consumer trigger with the fallback priced at 191% of churn. The consumer arrived — a moment no preserve captured — and the bounded-recovery stop was cut into SmokeHouse and read through DryAge. Kept here so the price and the trigger stay on the record beside the cut.</p></div>
+      <div class="helditem"><div class="hh">held · ADR-008 D2 · priced</div><h3>B+ tree disk pages</h3><p>The in-memory bound is measured at <span class="mono">181&nbsp;B/key</span> marginal — an 8&nbsp;GB heap carries ≈47M keys. D2 fires when a workload approaches heap&nbsp;÷&nbsp;181&nbsp;B live keys; below that, the Bitcask trade is the right trade.</p></div>
+      <div class="helditem"><div class="hh">staged · manual</div><h3>Maven Central, first release</h3><p>0.3.0 is tagged, signed-stageable, and checklisted — the portal upload is the one step no agent can press. The repo1 curl check is the step that would have caught 0.2.0.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>Every engine: MIT · Java 17 · Gradle 9.5.1 · nested composite builds — clone as siblings and every build resolves live sources.</span>
+    <span class="mono">the log is the only truth; fourteen engines kept it.</span>
+    <span>Source: <span class="mono">WholeHog/docs/atlas.html</span>, engine table regenerated from <span class="mono">CSRBT/tools/ecosystem_ledger.json</span> by <span class="mono">tools/atlas.py</span>; versions read from each repo's build file.</span>
+  </footer>
+</div>
+

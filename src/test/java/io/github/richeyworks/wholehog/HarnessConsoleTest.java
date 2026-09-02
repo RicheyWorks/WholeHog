@@ -145,6 +145,22 @@ final class HarnessConsoleTest {
             assertEquals("{\"ok\":true,\"count\":3,\"via\":\"direct\"}", r.answer("count 0 100"));
             assertTrue(r.answer("restart bogus").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
             assertTrue(r.answer("restart none 9999").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+            assertTrue(r.answer("restart none 0 9999").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+            // The feed seam (2026-09-02): hold the replica behind the primary for real, read the
+            // lag from the conductor's seat, then quiesce and read zero.
+            assertTrue(r.answer("restart none 0 150").contains("\"replicaLagMs\":150"));
+            assertTrue(r.answer("observe").contains("\"replicaLagMs\":150"));
+            for (int k = 10; k < 16; k++) {
+                r.answer("put " + k + " 1 1 1");
+            }
+            String held = r.answer("fleet");
+            assertTrue(held.contains("\"lag\":") && !held.contains("\"lag\":0,"),
+                    "six writes under a 150 ms feed: the fleet reports the replica behind: " + held);
+            assertTrue(held.contains("\"gapped\":false"), "behind, not gapped: " + held);
+            assertTrue(r.answer("quiesce 15000").contains("\"quiet\":true"));
+            assertTrue(r.answer("fleet").contains("\"lag\":0,"), "and caught up once the feed lands");
+            assertEquals("{\"ok\":true,\"count\":9,\"via\":\"direct\"}", r.answer("count 0 100"));
+            assertTrue(r.answer("restart").contains("\"replicaLagMs\":0"));
         } finally {
             r.close();
         }

@@ -70,8 +70,11 @@ import java.util.Map;
  *   verify GEN | names GEN       Jerky
  *   compact | segments           SmokeHouse
  *   recover | history            Twine journal replay | Rub's sample history
- *   restart [PLAN] [LATENCY]     close + reopen at the same root; PLAN = none | once:N |
- *                                every:N | prob:SEED:P (Sizzle), LATENCY ms per write op
+ *   restart [PLAN] [LATENCY] [REPLICA-LAG]
+ *                                close + reopen at the same root; PLAN = none | once:N |
+ *                                every:N | prob:SEED:P (Sizzle), LATENCY ms per write op,
+ *                                REPLICA-LAG ms each replicated event is held back (the
+ *                                feed seam; the replica is late, never wrong)
  *   quit
  * </pre>
  *
@@ -85,6 +88,8 @@ public final class HarnessConsole {
     static final String PROTOCOL = "1.0";
     static final int RANGE_CAP_MAX = 1000;
     static final int QUIESCE_MS_MAX = 30_000;
+    /** The most a restart may hold each replicated event back: a quiesce must still be able to converge. */
+    static final long REPLICA_LAG_MS_MAX = 500;
 
     static final String REPLICA = "exhibit";
 
@@ -259,6 +264,7 @@ public final class HarnessConsole {
                 .append(",\"champion\":").append(str(String.valueOf(bs.champion()))).append('}');
         b.append(",\"segments\":").append(o.primary().segmentStats().size());
         b.append(",\"chaos\":").append(str(chaos)).append(",\"restarts\":").append(restarts);
+        b.append(",\"replicaLagMs\":").append(o.replicaLagMillis());
         b.append(",\"replicaObserverDetached\":").append(replicaObserverDetached);
         return b.append('}').toString();
     }
@@ -617,16 +623,21 @@ public final class HarnessConsole {
         if (latency < 0 || latency > 5_000) {
             throw new IllegalArgumentException("latency must be 0..5000 ms");
         }
+        long replicaLag = t.length > 3 ? longArg(t, 3) : 0;
+        if (replicaLag < 0 || replicaLag > REPLICA_LAG_MS_MAX) {
+            throw new IllegalArgumentException("replica lag must be 0.." + REPLICA_LAG_MS_MAX + " ms");
+        }
         ChaosPlan plan = plan(planName);
         if (latency > 0) {
             plan = plan.withLatencyMillis(latency);
         }
         o.close();
-        o = new Organism(organismRoot, seed, plan);
+        o = new Organism(organismRoot, seed, plan, replicaLag);
         chaos = planName + (latency > 0 ? "+" + latency + "ms" : "");
         restarts++;
         replicaObserverDetached = false;
         return "{\"ok\":true,\"restarts\":" + restarts + ",\"chaos\":" + str(chaos)
+                + ",\"replicaLagMs\":" + replicaLag
                 + ",\"wirePort\":" + o.wirePort() + ",\"size\":" + o.primary().size()
                 + ",\"journalReplays\":" + o.twine().stats().journalReplays() + "}";
     }
