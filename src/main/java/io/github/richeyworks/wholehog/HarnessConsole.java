@@ -173,6 +173,11 @@ public final class HarnessConsole {
             return refuse("conflict", e.getMessage());
         } catch (Exception e) {
             return refuse("failed", e.getClass().getSimpleName() + ": " + e.getMessage());
+        } catch (Error e) {
+            // A StackOverflowError or OutOfMemoryError in one verb is that verb failing,
+            // not the console: report it and keep serving. The first robot (ADR-117) found
+            // one in a morph's health check, and the console died with it.
+            return refuse("failed", e.getClass().getSimpleName() + ": " + e.getMessage());
         }
     }
 
