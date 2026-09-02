@@ -161,6 +161,22 @@ final class HarnessConsoleTest {
             assertTrue(r.answer("fleet").contains("\"lag\":0,"), "and caught up once the feed lands");
             assertEquals("{\"ok\":true,\"count\":9,\"via\":\"direct\"}", r.answer("count 0 100"));
             assertTrue(r.answer("restart").contains("\"replicaLagMs\":0"));
+            // Engine 2, observed (2026-09-02): a clean restart uses the checkpoint and sorts
+            // nothing; a cold one dies without it, and the reopen scans the log and sorts.
+            String warm = r.answer("recovery");
+            assertTrue(warm.contains("\"hintUsed\":true") && warm.contains("\"sorted\":false"), warm);
+            for (int k = 30; k < 60; k++) {
+                r.answer("put " + k + " 1 1 1");
+            }
+            String cold = r.answer("restart none 0 0 cold");
+            assertTrue(cold.contains("\"how\":\"cold\"") && cold.contains("\"sorted\":true"), cold);
+            String rep = r.answer("recovery");
+            assertTrue(rep.contains("\"sorted\":true") && rep.contains("\"comparisons\":")
+                    && !rep.contains("\"sortStrategy\":\"\"") && !rep.contains("\"bornStrategy\":\"\""), rep);
+            assertEquals("{\"ok\":true,\"count\":39,\"via\":\"direct\"}", r.answer("count 0 100"),
+                    "recovery is correct, not just reported");
+            assertTrue(r.answer("observe").contains("\"recovery\":{\"entries\":39,\"sorted\":true"));
+            assertTrue(r.answer("restart none 0 0 lukewarm").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
         } finally {
             r.close();
         }

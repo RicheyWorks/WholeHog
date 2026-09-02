@@ -438,6 +438,21 @@ public final class Organism implements Closeable {
      */
     @Override
     public void close() throws IOException {
+        close(false);
+    }
+
+    /**
+     * Die instead of closing (2026-09-02): every organ is released as in {@link #close()}, but the
+     * store is {@link IndexedStore#abandon abandoned} -- no checkpoint -- so the next organism at
+     * this root walks the road every real crash takes: the log scan, SuperBeefSort's re-sort and
+     * profile, the born strategy. Until this, a restart always closed cleanly, and engine 2's
+     * recovery had never once run under the harness.
+     */
+    public void crash() throws IOException {
+        close(true);
+    }
+
+    private void close(boolean dirty) throws IOException {
         if (closed) {
             return;
         }
@@ -449,6 +464,10 @@ public final class Organism implements Closeable {
         brine.close();
         renderer.close();
         pitBoss.close();
-        indexed.close();
+        if (dirty) {
+            indexed.abandon();
+        } else {
+            indexed.close();
+        }
     }
 }

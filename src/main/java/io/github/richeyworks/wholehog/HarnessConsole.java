@@ -70,11 +70,16 @@ import java.util.Map;
  *   verify GEN | names GEN       Jerky
  *   compact | segments           SmokeHouse
  *   recover | history            Twine journal replay | Rub's sample history
- *   restart [PLAN] [LATENCY] [REPLICA-LAG]
+ *   restart [PLAN] [LATENCY] [REPLICA-LAG] [clean|cold]
  *                                close + reopen at the same root; PLAN = none | once:N |
  *                                every:N | prob:SEED:P (Sizzle), LATENCY ms per write op,
  *                                REPLICA-LAG ms each replicated event is held back (the
- *                                feed seam; the replica is late, never wrong)
+ *                                feed seam; the replica is late, never wrong); cold = the
+ *                                organism DIES instead of closing (no checkpoint), so the
+ *                                reopen is SmokeHouse's own recovery: log scan, SuperBeefSort
+ *   recovery                     what the last open did -- engine 2's report (SmokeHouse
+ *                                RecoveryReport): entries, hint, sorted, strategy, cost, the
+ *                                feed's disorder, the born tree
  *   quit
  * </pre>
  *
@@ -219,6 +224,7 @@ public final class HarnessConsole {
             case "recover":  return recover();
             case "history":  return history();
             case "restart":  return restart(t);
+            case "recovery": return recovery();
             case "report":   return ok("report", str(o.report()));
             case "tick":     return ok("vitals", vitals(o.rub().tick()));
             case "pulse":    return pulse();
@@ -265,6 +271,9 @@ public final class HarnessConsole {
         b.append(",\"segments\":").append(o.primary().segmentStats().size());
         b.append(",\"chaos\":").append(str(chaos)).append(",\"restarts\":").append(restarts);
         b.append(",\"replicaLagMs\":").append(o.replicaLagMillis());
+        SmokeHouse.RecoveryReport rr = o.primary().recovery();
+        b.append(",\"recovery\":{\"entries\":").append(rr.entries()).append(",\"sorted\":").append(rr.sorted())
+                .append(",\"hintUsed\":").append(rr.hintUsed()).append(",\"bornStrategy\":").append(str(rr.bornStrategy())).append('}');
         b.append(",\"replicaObserverDetached\":").append(replicaObserverDetached);
         return b.append('}').toString();
     }
@@ -627,19 +636,43 @@ public final class HarnessConsole {
         if (replicaLag < 0 || replicaLag > REPLICA_LAG_MS_MAX) {
             throw new IllegalArgumentException("replica lag must be 0.." + REPLICA_LAG_MS_MAX + " ms");
         }
+        String how = t.length > 4 ? t[4] : "clean";
+        if (!how.equals("clean") && !how.equals("cold")) {
+            throw new IllegalArgumentException("restart's fifth argument is clean or cold, not " + how);
+        }
         ChaosPlan plan = plan(planName);
         if (latency > 0) {
             plan = plan.withLatencyMillis(latency);
         }
-        o.close();
+        if (how.equals("cold")) {
+            o.crash();
+        } else {
+            o.close();
+        }
         o = new Organism(organismRoot, seed, plan, replicaLag);
         chaos = planName + (latency > 0 ? "+" + latency + "ms" : "");
         restarts++;
         replicaObserverDetached = false;
         return "{\"ok\":true,\"restarts\":" + restarts + ",\"chaos\":" + str(chaos)
-                + ",\"replicaLagMs\":" + replicaLag
+                + ",\"replicaLagMs\":" + replicaLag + ",\"how\":" + str(how)
+                + ",\"recovery\":" + recoveryJson()
                 + ",\"wirePort\":" + o.wirePort() + ",\"size\":" + o.primary().size()
                 + ",\"journalReplays\":" + o.twine().stats().journalReplays() + "}";
+    }
+
+    /** Engine 2's report of the last open. */
+    String recovery() {
+        return "{\"ok\":true,\"recovery\":" + recoveryJson() + "}";
+    }
+
+    String recoveryJson() {
+        SmokeHouse.RecoveryReport r = o.primary().recovery();
+        return "{\"entries\":" + r.entries() + ",\"hintUsed\":" + r.hintUsed() + ",\"bounded\":" + r.bounded()
+                + ",\"sorted\":" + r.sorted() + ",\"sortStrategy\":" + str(r.sortStrategy())
+                + ",\"comparisons\":" + r.comparisons() + ",\"moves\":" + r.moves()
+                + ",\"sortMillis\":" + r.sortMillis() + ",\"sortednessRatio\":" + r.sortednessRatio()
+                + ",\"inversions\":" + r.inversions() + ",\"nearlySorted\":" + r.nearlySorted()
+                + ",\"bornStrategy\":" + str(r.bornStrategy()) + ",\"tier\":" + str(r.tier()) + "}";
     }
 
     static ChaosPlan plan(String spec) {
