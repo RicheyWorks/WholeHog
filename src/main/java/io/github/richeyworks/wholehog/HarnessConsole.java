@@ -15,6 +15,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -77,6 +80,9 @@ import java.util.Map;
  *                                feed seam; the replica is late, never wrong); cold = the
  *                                organism DIES instead of closing (no checkpoint), so the
  *                                reopen is SmokeHouse's own recovery: log scan, SuperBeefSort
+ *   jvm                          the process itself: live threads (by name), open file
+ *                                descriptors where the platform reports them, heap in use --
+ *                                what a hundred restarts must NOT grow (ADR-123)
  *   recovery                     what the last open did -- engine 2's report (SmokeHouse
  *                                RecoveryReport): entries, hint, sorted, strategy, cost, the
  *                                feed's disorder, the born tree
@@ -228,6 +234,7 @@ public final class HarnessConsole {
             case "report":   return ok("report", str(o.report()));
             case "tick":     return ok("vitals", vitals(o.rub().tick()));
             case "pulse":    return pulse();
+            case "jvm":      return jvm();
             case "quiesce":  return quiesce(intArg(t, 1, 0, QUIESCE_MS_MAX));
             case "preserve": return preserve();
             case "coldscan": return coldscan(longArg(t, 1));
@@ -271,6 +278,13 @@ public final class HarnessConsole {
         b.append(",\"segments\":").append(o.primary().segmentStats().size());
         b.append(",\"chaos\":").append(str(chaos)).append(",\"restarts\":").append(restarts);
         b.append(",\"replicaLagMs\":").append(o.replicaLagMillis());
+        long fds = -1;
+        java.lang.management.OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
+        if (os instanceof com.sun.management.UnixOperatingSystemMXBean unix) {
+            fds = unix.getOpenFileDescriptorCount();
+        }
+        b.append(",\"jvm\":{\"threads\":").append(ManagementFactory.getThreadMXBean().getThreadCount())
+                .append(",\"fds\":").append(fds).append('}');
         SmokeHouse.RecoveryReport rr = o.primary().recovery();
         b.append(",\"recovery\":{\"entries\":").append(rr.entries()).append(",\"sorted\":").append(rr.sorted())
                 .append(",\"hintUsed\":").append(rr.hintUsed()).append(",\"bornStrategy\":").append(str(rr.bornStrategy())).append('}');
@@ -658,6 +672,36 @@ public final class HarnessConsole {
                 + ",\"recovery\":" + recoveryJson()
                 + ",\"wirePort\":" + o.wirePort() + ",\"size\":" + o.primary().size()
                 + ",\"journalReplays\":" + o.twine().stats().journalReplays() + "}";
+    }
+
+    /**
+     * The process, as a leak detector sees it: live threads by name, open file descriptors (-1
+     * where the platform's MXBean has no such count), heap in use. An organism that is closed
+     * and reopened a hundred times must leave these where it found them; a thread or a handle
+     * that survives close() shows up here as a count that only rises (ADR-123).
+     */
+    String jvm() {
+        ThreadMXBean tm = ManagementFactory.getThreadMXBean();
+        List<String> names = new ArrayList<>();
+        for (ThreadInfo ti : tm.getThreadInfo(tm.getAllThreadIds())) {
+            if (ti != null) {
+                names.add(ti.getThreadName());
+            }
+        }
+        names.sort(null);
+        long fds = -1;
+        java.lang.management.OperatingSystemMXBean os = ManagementFactory.getOperatingSystemMXBean();
+        if (os instanceof com.sun.management.UnixOperatingSystemMXBean unix) {
+            fds = unix.getOpenFileDescriptorCount();
+        }
+        Runtime rt = Runtime.getRuntime();
+        List<String> quoted = new ArrayList<>();
+        for (String n : names) {
+            quoted.add(str(n));
+        }
+        return "{\"ok\":true,\"threads\":" + names.size() + ",\"threadNames\":[" + String.join(",", quoted)
+                + "],\"fds\":" + fds + ",\"heapUsedMb\":" + ((rt.totalMemory() - rt.freeMemory()) >> 20)
+                + ",\"restarts\":" + restarts + "}";
     }
 
     /** Engine 2's report of the last open. */

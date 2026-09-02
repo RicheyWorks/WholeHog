@@ -29,3 +29,12 @@ sort.
   `restart` carry the report's headline. `HarnessConsoleTest` extended. Suite
   **21** green.
 - `docs/atlas.html` regenerated (SmokeHouse 82).
+
+## Also (ADR-123, same day): `jvm`
+
+`HarnessConsole` gains a `jvm` verb — live threads by name, open file
+descriptors where the platform counts them, heap in use — and every `observe`
+carries the counts. `HarnessConsoleTest`: ten restarts leave the same threads
+by name. The first probe read descriptors climbing one per cold restart: a
+segment per cold open, a cached reader per segment read, given back by a
+compact — not a leak, and the bound the harness now enforces.

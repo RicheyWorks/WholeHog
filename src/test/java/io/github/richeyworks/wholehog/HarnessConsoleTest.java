@@ -177,6 +177,18 @@ final class HarnessConsoleTest {
                     "recovery is correct, not just reported");
             assertTrue(r.answer("observe").contains("\"recovery\":{\"entries\":39,\"sorted\":true"));
             assertTrue(r.answer("restart none 0 0 lukewarm").startsWith("{\"ok\":false,\"code\":\"invalid_argument\""));
+            // ADR-123: the process, restarted ten more times, has the threads it started with.
+            String j0 = r.answer("jvm");
+            assertTrue(j0.startsWith("{\"ok\":true,\"threads\":") && j0.contains("\"threadNames\":[") && j0.contains("\"fds\":"), j0);
+            String names0 = j0.replaceAll(".*\"threadNames\":(\\[.*?\\]).*", "$1");
+            for (int i = 0; i < 10; i++) {
+                r.answer("restart none 0 0 " + (i % 2 == 0 ? "clean" : "cold"));
+                r.answer("put " + (200 + i) + " 1 1 1");
+            }
+            r.answer("quiesce 15000");
+            String names1 = r.answer("jvm").replaceAll(".*\"threadNames\":(\\[.*?\\]).*", "$1");
+            assertEquals(names0, names1, "ten restarts later the live threads are the same ones, by name");
+            assertTrue(r.answer("observe").contains("\"jvm\":{\"threads\":"));
         } finally {
             r.close();
         }
